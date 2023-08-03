@@ -1,0 +1,22 @@
+{
+  "name": "rocketweb/module-cms-import-export",
+  "description": "CMS import and export CLI command extension that allows syncing CMS blocks & pages between environments",
+  "type": "magento2-module",
+  "require": {
+    "php": "^7.4|^8.0",
+    "magento/module-cms": "104.0.*"
+  },
+  "license": [
+    "OSL-3.0",
+    "AFL-3.0"
+  ],
+  "autoload": {
+    "files": [
+      "registration.php"
+    ],
+    "psr-4": {
+      "RocketWeb\\CmsImportExport\\": ""
+    }
+  }
+}
+

@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+
+<!--
+  ~ RocketWeb
+  ~
+  ~  NOTICE OF LICENSE
+  ~
+  ~  This source file is subject to the Open Software License (OSL 3.0)
+  ~  that is bundled with this package in the file LICENSE.txt.
+  ~  It is also available through the world-wide-web at this URL:
+  ~  http://opensource.org/licenses/osl-3.0.php
+  ~
+  ~  @category  RocketWeb
+  ~  @copyright Copyright (c) 2020 RocketWeb (http://rocketweb.com)
+  ~  @license   http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+  ~  @author    Rocket Web Inc.
+  -->
+
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <type name="Magento\Framework\Console\CommandListInterface">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="rocketweb_cms_dump_data" xsi:type="object">RocketWeb\CmsImportExport\Console\Command\DumpCmsData</item>
+                <item name="rocketweb_cms_import_data" xsi:type="object">RocketWeb\CmsImportExport\Console\Command\ImportCmsData</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="RocketWeb\CmsImportExport\Console\Command\DumpCmsData">
+        <arguments>
+            <argument name="dumpCmsDataService" xsi:type="object">RocketWeb\CmsImportExport\Model\Service\DumpCmsDataService\Proxy</argument>
+        </arguments>
+    </type>
+    <type name="RocketWeb\CmsImportExport\Console\Command\ImportCmsData">
+        <arguments>
+            <argument name="importCmsDataService" xsi:type="object">RocketWeb\CmsImportExport\Model\Service\ImportCmsDataService\Proxy</argument>
+        </arguments>
+    </type>
+</config>
