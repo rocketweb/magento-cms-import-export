@@ -4,7 +4,7 @@ A tool to manage CMS content (both blocks &amp; pages) being imported/exported b
 ## Installation
 Using composer:
 ```
-composer2 require rocketweb/magento-captcha-bypass
+composer2 require rocketweb/module-cms-import-export
 ```
 
 Once the tool is installed, we have two workflows, depending on what we are trying to do.
