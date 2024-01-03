@@ -49,12 +49,12 @@ class DumpCmsDataService
         $this->categoryList = $categoryList;
     }
 
-    public function execute(array $types, ?array $identifiers)
+    public function execute(array $types, ?array $identifiers, ?bool $removeAll)
     {
         $varDirectory = $this->filesystem->getDirectoryWrite(DirectoryList::VAR_DIR);
         $varPath = $this->directoryList->getPath(DirectoryList::VAR_DIR);
         $workingDirPath = $varPath . '/sync_cms_data';
-        if ($varDirectory->isExist($workingDirPath)) {
+        if ($varDirectory->isExist($workingDirPath) && $removeAll) {
             $varDirectory->delete($workingDirPath);
         }
 
