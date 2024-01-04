@@ -83,12 +83,16 @@ class DumpCmsDataService
     private function getStoreCodes($stores): array
     {
         $storeCodes = [];
-        if ($stores) {
+        if (!$stores) {
+            return [self::STORE_SCOPE_ALL];
+        } else {
             foreach ($stores as $storeId) {
+                if ($storeId == 0) {
+                    return [self::STORE_SCOPE_ALL];
+                }
                 try {
                     $store = $this->storeManager->getStore($storeId);
-                    $storeCode = $storeId ? $store->getCode() : self::STORE_SCOPE_ALL;
-                    $storeCodes[] = $storeCode;
+                    $storeCodes[] = $store->getCode();
                 } catch (\Magento\Framework\Exception\NoSuchEntityException $exception) {
                     echo $exception->getMessage() . "\n";
                 }
