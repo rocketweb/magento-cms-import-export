@@ -28,7 +28,7 @@ Dumps cms pages/blocks to var/sync_cms_data for further import
 Options:
 -t, --type=TYPE                Which type are we dumping - block/page/all
 -i, --identifier[=IDENTIFIER]  identifier to process (one or CSV list)
--r, --importAll                Flag to import all files
+-a, --importAll                Flag to import all files
 ```
 
 As you can see from the options, we need to define:
