@@ -107,6 +107,9 @@ class ImportCmsDataService
             $block->setIdentifier($jsonData['identifier']);
             $block->setStoreId($jsonData['stores'][0]);
             $block->setIsActive((bool)$jsonData['is_active']);
+            if (isset($jsonData['is_tailwindcss_jit_enabled'])) {
+                $block->setIsTailwindcssJitEnabled($jsonData['is_tailwindcss_jit_enabled']);
+            }
 
             try {
                 $this->blockRepository->save($block);
@@ -154,6 +157,9 @@ class ImportCmsDataService
             $page->setPageLayout($jsonData['page_layout']);
             $page->setContentHeading($jsonData['content_heading']);
             $page->setIsActive((bool)$jsonData['is_active']);
+            if (isset($jsonData['is_tailwindcss_jit_enabled'])) {
+                $page->setIsTailwindcssJitEnabled($jsonData['is_tailwindcss_jit_enabled']);
+            }
 
             try {
                 $this->pageRepository->save($page);
