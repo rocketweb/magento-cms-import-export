@@ -47,12 +47,16 @@ class ImportCmsDataService
         $this->pageFactory = $pageFactory;
     }
 
-    public function execute(array $types, ?array $identifiers)
+    public function execute(array $types, ?array $identifiers, bool $importAll)
     {
         $workingDirPath = 'sync_cms_data';
 
         if (!$this->directoryRead->isExist($this->varPath . $workingDirPath)) {
             throw new \Exception('The sync folder does not exists! Path: ' . $workingDirPath);
+        }
+
+        if (!$identifiers && !$importAll) {
+            throw new \Exception('If you want to import all entries at once, use --importAll flag');
         }
 
         foreach ($types as $type) {
