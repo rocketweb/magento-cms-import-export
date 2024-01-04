@@ -102,6 +102,9 @@ class DumpCmsDataService
                 'content_heading' => $page->getContentHeading(),
 
             ];
+            if ($page->getIsTailwindcssJitEnabled() !== null) {
+                $jsonContent['is_tailwindcss_jit_enabled'] = $page->getIsTailwindcssJitEnabled();
+            }
             $this->write($varDirectory, $jsonPath, $this->serializer->serialize($jsonContent));
         }
     }
@@ -133,6 +136,9 @@ class DumpCmsDataService
                 'stores' => [1],
                 'is_active' => $block->isActive()
             ];
+            if ($block->getIsTailwindcssJitEnabled() !== null) {
+                $jsonContent['is_tailwindcss_jit_enabled'] = $block->getIsTailwindcssJitEnabled();
+            }
             $this->write($varDirectory, $jsonPath, $this->serializer->serialize($jsonContent));
         }
     }
