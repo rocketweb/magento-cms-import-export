@@ -22,6 +22,7 @@ use Magento\Framework\Filesystem\Directory\WriteInterface;
 
 class DumpCmsDataService
 {
+    public const STORE_SCOPE_ALL = '_all_';
     private \Magento\Cms\Api\PageRepositoryInterface $pageRepository;
     private \Magento\Cms\Api\BlockRepositoryInterface $blockRepository;
     private \Magento\Framework\Api\SearchCriteriaBuilder $criteriaBuilder;
@@ -29,6 +30,7 @@ class DumpCmsDataService
     private \Magento\Framework\Filesystem $filesystem;
     private \Magento\Framework\Serialize\SerializerInterface $serializer;
     private \Magento\Catalog\Model\CategoryList $categoryList;
+    private \Magento\Store\Model\StoreManagerInterface $storeManager;
     private array $blockIdentifiers = [];
 
     public function __construct(
@@ -38,7 +40,8 @@ class DumpCmsDataService
         \Magento\Framework\Api\SearchCriteriaBuilder $criteriaBuilder,
         \Magento\Framework\Filesystem\DirectoryList $directoryList,
         \Magento\Framework\Filesystem $filesystem,
-        \Magento\Framework\Serialize\SerializerInterface $serializer
+        \Magento\Framework\Serialize\SerializerInterface $serializer,
+        \Magento\Store\Model\StoreManagerInterface $storeManager
     ) {
         $this->pageRepository = $pageRepository;
         $this->blockRepository = $blockRepository;
@@ -47,6 +50,7 @@ class DumpCmsDataService
         $this->filesystem = $filesystem;
         $this->serializer = $serializer;
         $this->categoryList = $categoryList;
+        $this->storeManager = $storeManager;
     }
 
     public function execute(array $types, ?array $identifiers, bool $removeAll)
@@ -76,6 +80,28 @@ class DumpCmsDataService
         $stream->close();
     }
 
+    private function getStoreCodes($stores): array
+    {
+        $storeCodes = [];
+        if (!$stores) {
+            return [self::STORE_SCOPE_ALL];
+        } else {
+            foreach ($stores as $storeId) {
+                if ($storeId == 0) {
+                    return [self::STORE_SCOPE_ALL];
+                }
+                try {
+                    $store = $this->storeManager->getStore($storeId);
+                    $storeCodes[] = $store->getCode();
+                } catch (\Magento\Framework\Exception\NoSuchEntityException $exception) {
+                    echo $exception->getMessage() . "\n";
+                }
+            }
+        }
+
+        return $storeCodes;
+    }
+
     private function dumpPages(string $path, WriteInterface $varDirectory, ?array $identifiers): void
     {
         $searchCriteria = $this->criteriaBuilder;
@@ -91,14 +117,16 @@ class DumpCmsDataService
             if (strpos($identifier, '.html') !== false) {
                 $identifier = str_replace('.html', '_html', $identifier);
             }
-            $htmlPath = $path . $identifier . '.html';
+            $storeCodes = $this->getStoreCodes($page->getStores());
+            $htmlPath = $path . $identifier . '|' . implode('|', $storeCodes) . '.html';
             $this->write($varDirectory, $htmlPath, $page->getContent());
-            $jsonPath = $path . $identifier . '.json';
+            $jsonPath = $path . $identifier . '|' . implode('|', $storeCodes) . '.json';
             $jsonContent = [
                 'title' => $page->getTitle(),
                 'is_active' => $page->isActive(),
                 'page_layout' => $page->getPageLayout(),
                 'identifier' => $page->getIdentifier(),
+                'stores' => $storeCodes,
                 'content_heading' => $page->getContentHeading(),
 
             ];
@@ -127,13 +155,14 @@ class DumpCmsDataService
                 continue;
             }
             $this->blockIdentifiers[$block->getId()] = $block->getIdentifier();
-            $htmlPath = $path . trim($block->getIdentifier()) . '.html';
+            $storeCodes = $this->getStoreCodes($block->getStores());
+            $htmlPath = $path . trim($block->getIdentifier()) . '|' . implode('|', $storeCodes) . '.html';
             $this->write($varDirectory, $htmlPath, $block->getContent());
-            $jsonPath = $path . trim($block->getIdentifier()) . '.json';
+            $jsonPath = $path . trim($block->getIdentifier()) . '|' . implode('|', $storeCodes) . '.json';
             $jsonContent = [
                 'title' => $block->getTitle(),
                 'identifier' => $block->getIdentifier(),
-                'stores' => [1],
+                'stores' => $storeCodes,
                 'is_active' => $block->isActive()
             ];
             if ($block->getIsTailwindcssJitEnabled() !== null) {
