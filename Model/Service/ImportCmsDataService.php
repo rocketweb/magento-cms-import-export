@@ -51,12 +51,16 @@ class ImportCmsDataService
         $this->storeRepository = $storeRepository;
     }
 
-    public function execute(array $types, ?array $identifiers)
+    public function execute(array $types, ?array $identifiers, bool $importAll)
     {
         $workingDirPath = 'sync_cms_data';
 
         if (!$this->directoryRead->isExist($this->varPath . $workingDirPath)) {
             throw new \Exception('The sync folder does not exists! Path: ' . $workingDirPath);
+        }
+
+        if (!$identifiers && !$importAll) {
+            throw new \Exception('If you want to import all entries at once, use --importAll flag');
         }
 
         foreach ($types as $type) {
@@ -129,6 +133,10 @@ class ImportCmsDataService
             $block->setIdentifier($jsonData['identifier']);
             $block->setIsActive((bool)$jsonData['is_active']);
             $block->setStores($storeIds);
+            if (isset($jsonData['is_tailwindcss_jit_enabled'])) {
+                $block->setIsTailwindcssJitEnabled($jsonData['is_tailwindcss_jit_enabled']);
+            }
+
             try {
                 $this->blockRepository->save($block);
             } catch (\Exception $exception) {
@@ -178,6 +186,9 @@ class ImportCmsDataService
             $page->setContentHeading($jsonData['content_heading']);
             $page->setIsActive((bool)$jsonData['is_active']);
             $page->setStores($storeIds);
+            if (isset($jsonData['is_tailwindcss_jit_enabled'])) {
+                $page->setIsTailwindcssJitEnabled($jsonData['is_tailwindcss_jit_enabled']);
+            }
 
             try {
                 $this->pageRepository->save($page);
