@@ -66,7 +66,7 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
     protected function execute(InputInterface $input, OutputInterface $output): void
     {
         $type = $input->getOption(self::INPUT_KEY_TYPE);
-        $removeAll = $input->getOption(self::INPUT_KEY_REMOVE_ALL);
+        $removeAll = (bool)$input->getOption(self::INPUT_KEY_REMOVE_ALL);
         if ($type === null) {
             throw new \RuntimeException("Type ([-t|--type) is required");
         }

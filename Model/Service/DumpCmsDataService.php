@@ -49,7 +49,7 @@ class DumpCmsDataService
         $this->categoryList = $categoryList;
     }
 
-    public function execute(array $types, ?array $identifiers, ?bool $removeAll)
+    public function execute(array $types, ?array $identifiers, bool $removeAll)
     {
         $varDirectory = $this->filesystem->getDirectoryWrite(DirectoryList::VAR_DIR);
         $varPath = $this->directoryList->getPath(DirectoryList::VAR_DIR);
