@@ -30,6 +30,7 @@ class DumpCmsDataService
     private \Magento\Framework\Serialize\SerializerInterface $serializer;
     private \Magento\Catalog\Model\CategoryList $categoryList;
     private array $blockIdentifiers = [];
+    private array $blocksMapping = [];
 
     public function __construct(
         \Magento\Cms\Api\PageRepositoryInterface $pageRepository,
@@ -54,6 +55,7 @@ class DumpCmsDataService
         $varDirectory = $this->filesystem->getDirectoryWrite(DirectoryList::VAR_DIR);
         $varPath = $this->directoryList->getPath(DirectoryList::VAR_DIR);
         $workingDirPath = $varPath . '/sync_cms_data';
+        $this->blocksMapping = $this->getBlocksMapping();
         if ($varDirectory->isExist($workingDirPath)) {
             $varDirectory->delete($workingDirPath);
         }
@@ -76,6 +78,34 @@ class DumpCmsDataService
         $stream->close();
     }
 
+    private function getBlocksMapping(): array
+    {
+        $blocksMapping = [];
+        $searchCriteria = $this->criteriaBuilder;
+        $blocksList = $this->blockRepository->getList($searchCriteria->create());
+        $blocks = $blocksList->getItems();
+        foreach ($blocks as $block) {
+            $blocksMapping[$block->getId()] = $block->getIdentifier();
+        }
+
+        return $blocksMapping;
+    }
+
+    private function replaceBlockIds(string $content): string
+    {
+        preg_match_all('/block_id=\"([0-9]+)\"/', $content, $blockIds);
+        if (isset($blockIds[1])) {
+            foreach ($blockIds[1] as $blockId) {
+                if (isset($this->blocksMapping[$blockId])) {
+                    $identifier = $this->blocksMapping[$blockId];
+                    $content = str_replace("block_id=\"$blockId\"", "block_id=\"$identifier\"", $content);
+                }
+            }
+        }
+
+        return $content;
+    }
+
     private function dumpPages(string $path, WriteInterface $varDirectory, ?array $identifiers): void
     {
         $searchCriteria = $this->criteriaBuilder;
@@ -92,7 +122,8 @@ class DumpCmsDataService
                 $identifier = str_replace('.html', '_html', $identifier);
             }
             $htmlPath = $path . $identifier . '.html';
-            $this->write($varDirectory, $htmlPath, $page->getContent());
+            $pageContent = $this->replaceBlockIds($page->getContent());
+            $this->write($varDirectory, $htmlPath, $pageContent);
             $jsonPath = $path . $identifier . '.json';
             $jsonContent = [
                 'title' => $page->getTitle(),
