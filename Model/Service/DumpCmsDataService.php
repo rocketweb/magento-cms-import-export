@@ -32,6 +32,7 @@ class DumpCmsDataService
     private \Magento\Catalog\Model\CategoryList $categoryList;
     private \Magento\Store\Model\StoreManagerInterface $storeManager;
     private array $blockIdentifiers = [];
+    private array $blocksMapping = [];
 
     public function __construct(
         \Magento\Cms\Api\PageRepositoryInterface $pageRepository,
@@ -80,6 +81,28 @@ class DumpCmsDataService
         $stream->close();
     }
 
+    private function replaceBlockIds(string $content): string
+    {
+        preg_match_all('/block_id=\"([0-9]+)\"/', $content, $blockIds);
+        if (isset($blockIds[1])) {
+            $searchCriteria = $this->criteriaBuilder;
+            $searchCriteria->addFilter('block_id', $blockIds[1], 'in');
+            $blocksList = $this->blockRepository->getList($searchCriteria->create());
+            $blocks = $blocksList->getItems();
+            foreach ($blocks as $block) {
+                if (!isset($this->blocksMapping[$block->getId()])) {
+                    $this->blocksMapping[$block->getId()] = $block->getIdentifier();
+                }
+            }
+            foreach ($blockIds[1] as $blockId) {
+                $identifier = $this->blocksMapping[$blockId];
+                $content = str_replace("block_id=\"$blockId\"", "block_id=\"$identifier\"", $content);
+            }
+        }
+
+        return $content;
+    }
+
     private function getStoreCodes($stores): array
     {
         $storeCodes = [];
@@ -117,9 +140,11 @@ class DumpCmsDataService
             if (strpos($identifier, '.html') !== false) {
                 $identifier = str_replace('.html', '_html', $identifier);
             }
+
             $storeCodes = $this->getStoreCodes($page->getStores());
             $htmlPath = $path . $identifier . '|' . implode('|', $storeCodes) . '.html';
-            $this->write($varDirectory, $htmlPath, $page->getContent());
+            $pageContent = $this->replaceBlockIds($page->getContent());
+            $this->write($varDirectory, $htmlPath, $pageContent);
             $jsonPath = $path . $identifier . '|' . implode('|', $storeCodes) . '.json';
             $jsonContent = [
                 'title' => $page->getTitle(),
