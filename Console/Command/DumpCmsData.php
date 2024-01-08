@@ -25,6 +25,7 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
     private const INPUT_KEY_TYPE = 'type';
     private const INPUT_TYPE_VALUES = ['block', 'page', 'all'];
     private const INPUT_KEY_IDENTIFIER = 'identifier';
+    private const INPUT_KEY_REMOVE_ALL = 'removeAll';
     private \RocketWeb\CmsImportExport\Model\Service\DumpCmsDataService $dumpCmsDataService;
 
     public function __construct(
@@ -51,6 +52,12 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
                 'i',
                 InputOption::VALUE_OPTIONAL,
                 'identifier to process (one or CSV list)'
+            ),
+            new InputOption(
+                self::INPUT_KEY_REMOVE_ALL,
+                'r',
+                InputOption::VALUE_NONE,
+                'Flag to remove all existing data'
             )
         ]);
         parent::configure();
@@ -59,6 +66,7 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
     protected function execute(InputInterface $input, OutputInterface $output): void
     {
         $type = $input->getOption(self::INPUT_KEY_TYPE);
+        $removeAll = (bool)$input->getOption(self::INPUT_KEY_REMOVE_ALL);
         if ($type === null) {
             throw new \RuntimeException("Type ([-t|--type) is required");
         }
@@ -78,6 +86,6 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
             $identifiers = explode(',', $identifiers);
         }
 
-        $this->dumpCmsDataService->execute($types, $identifiers);
+        $this->dumpCmsDataService->execute($types, $identifiers, $removeAll);
     }
 }

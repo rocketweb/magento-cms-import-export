@@ -27,6 +27,7 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
     private const INPUT_KEY_TYPE = 'type';
     private const INPUT_TYPE_VALUES = ['block', 'page', 'all'];
     private const INPUT_KEY_IDENTIFIER = 'identifier';
+    private const INPUT_KEY_IMPORT_ALL = 'importAll';
     private \RocketWeb\CmsImportExport\Model\Service\ImportCmsDataService $importCmsDataService;
 
     public function __construct(
@@ -53,6 +54,12 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
                 'i',
                 InputOption::VALUE_OPTIONAL,
                 'identifier to process (one or CSV list)'
+            ),
+            new InputOption(
+                self::INPUT_KEY_IMPORT_ALL,
+                'a',
+                InputOption::VALUE_NONE,
+                'Flag to import all files'
             )
         ]);
         parent::configure();
@@ -61,6 +68,7 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
     protected function execute(InputInterface $input, OutputInterface $output): void
     {
         $type = $input->getOption(self::INPUT_KEY_TYPE);
+        $importAll = (bool)$input->getOption(self::INPUT_KEY_IMPORT_ALL);
         if ($type === null) {
             throw new \RuntimeException("Type ([-t|--type) is required");
         }
@@ -80,6 +88,6 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
             $identifiers = explode(',', $identifiers);
         }
 
-        $this->importCmsDataService->execute($types, $identifiers);
+        $this->importCmsDataService->execute($types, $identifiers, $importAll);
     }
 }

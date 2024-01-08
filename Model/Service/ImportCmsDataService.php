@@ -21,12 +21,14 @@ use Magento\Framework\App\Filesystem\DirectoryList;
 
 class ImportCmsDataService
 {
+    private const STORE_SCOPE_ADMIN = 'admin';
     private \Magento\Cms\Api\PageRepositoryInterface $pageRepository;
     private \Magento\Cms\Api\BlockRepositoryInterface $blockRepository;
     private \Magento\Framework\Serialize\SerializerInterface $serializer;
     private \Magento\Framework\Filesystem\Directory\ReadInterface $directoryRead;
     private \Magento\Cms\Api\Data\BlockInterfaceFactory $blockFactory;
     private \Magento\Cms\Api\Data\PageInterfaceFactory $pageFactory;
+    private \Magento\Store\Api\StoreRepositoryInterface $storeRepository;
     private string $varPath;
 
     public function __construct(
@@ -36,7 +38,8 @@ class ImportCmsDataService
         \Magento\Cms\Api\Data\BlockInterfaceFactory $blockFactory,
         \Magento\Framework\Filesystem\DirectoryList $directoryList,
         \Magento\Framework\Filesystem $filesystem,
-        \Magento\Framework\Serialize\SerializerInterface $serializer
+        \Magento\Framework\Serialize\SerializerInterface $serializer,
+        \Magento\Store\Api\StoreRepositoryInterface $storeRepository
     ) {
         $this->pageRepository = $pageRepository;
         $this->blockRepository = $blockRepository;
@@ -45,14 +48,19 @@ class ImportCmsDataService
         $this->varPath = $directoryList->getPath(DirectoryList::VAR_DIR) . '/';
         $this->blockFactory = $blockFactory;
         $this->pageFactory = $pageFactory;
+        $this->storeRepository = $storeRepository;
     }
 
-    public function execute(array $types, ?array $identifiers)
+    public function execute(array $types, ?array $identifiers, bool $importAll)
     {
         $workingDirPath = 'sync_cms_data';
 
         if (!$this->directoryRead->isExist($this->varPath . $workingDirPath)) {
             throw new \Exception('The sync folder does not exists! Path: ' . $workingDirPath);
+        }
+
+        if (!$identifiers && !$importAll) {
+            throw new \Exception('If you want to import all entries at once, use --importAll flag');
         }
 
         foreach ($types as $type) {
@@ -69,6 +77,26 @@ class ImportCmsDataService
         }
     }
 
+    private function getStoreIds($storeCodes): array
+    {
+        $storeIds = [];
+        if (is_array($storeCodes) && count($storeCodes)) {
+            foreach ($storeCodes as $storeCode) {
+                try {
+                    if ($storeCode === DumpCmsDataService::STORE_SCOPE_ALL) {
+                        $storeCode = self::STORE_SCOPE_ADMIN;
+                    }
+                    $store = $this->storeRepository->get($storeCode);
+                    $storeIds[] = $store->getId();
+                } catch (\Magento\Framework\Exception\NoSuchEntityException $exception) {
+                    echo $exception->getMessage() . "\n";
+                }
+            }
+        }
+
+        return $storeIds;
+    }
+
     private function importBlocks(string $dirPath, ?array $identifiers): void
     {
         $filePaths = $this->directoryRead->read($this->varPath . $dirPath);
@@ -79,6 +107,7 @@ class ImportCmsDataService
             }
             $identifier = str_replace($dirPath, '', $filePath);
             $identifier = str_replace('.html', '', $identifier);
+            $identifier = substr_replace($identifier, '', strpos($identifier, '|'));
             if ($identifiers !== null && !in_array($identifier, $identifiers)) {
                 // If we have a list of items, we skip if its not in the list
                 continue;
@@ -98,11 +127,15 @@ class ImportCmsDataService
                 'stores' => [1],
                 'is_active' => $block->isActive()
             ];*/
+            $storeIds = $this->getStoreIds($jsonData['stores']);
             $block->setTitle($jsonData['title']);
             $block->setContent($content);
             $block->setIdentifier($jsonData['identifier']);
-            $block->setStoreId($jsonData['stores'][0]);
             $block->setIsActive((bool)$jsonData['is_active']);
+            $block->setStores($storeIds);
+            if (isset($jsonData['is_tailwindcss_jit_enabled'])) {
+                $block->setIsTailwindcssJitEnabled($jsonData['is_tailwindcss_jit_enabled']);
+            }
 
             try {
                 $this->blockRepository->save($block);
@@ -121,8 +154,9 @@ class ImportCmsDataService
                 continue;
             }
             $identifier = str_replace($dirPath, '', $filePath);
-            $identifier = str_replace('|', '/', $identifier);
             $identifier = str_replace('.html', '', $identifier);
+            $identifier = substr_replace($identifier, '', strpos($identifier, '|'));
+            $identifier = str_replace('|', '/', $identifier);
             $identifier = str_replace('_html', '.html', $identifier);
             if ($identifiers !== null && !in_array($identifier, $identifiers)) {
                 // If we have a list of items, we skip if its not in the list
@@ -137,6 +171,7 @@ class ImportCmsDataService
             $content = $this->directoryRead->readFile($filePath);
             $jsonData = $this->directoryRead->readFile(str_replace('.html', '.json', $filePath));
             $jsonData = $this->serializer->unserialize($jsonData);
+            $storeIds = $this->getStoreIds($jsonData['stores']);
             /*$jsonContent = [
                 'title' => $page->getTitle(),
                 'is_active' => $page->isActive(),
@@ -150,6 +185,10 @@ class ImportCmsDataService
             $page->setPageLayout($jsonData['page_layout']);
             $page->setContentHeading($jsonData['content_heading']);
             $page->setIsActive((bool)$jsonData['is_active']);
+            $page->setStores($storeIds);
+            if (isset($jsonData['is_tailwindcss_jit_enabled'])) {
+                $page->setIsTailwindcssJitEnabled($jsonData['is_tailwindcss_jit_enabled']);
+            }
 
             try {
                 $this->pageRepository->save($page);
