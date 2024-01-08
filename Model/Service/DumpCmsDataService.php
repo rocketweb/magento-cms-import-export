@@ -81,11 +81,16 @@ class DumpCmsDataService
     {
         preg_match_all('/block_id=\"([0-9]+)\"/', $content, $blockIds);
         if (isset($blockIds[1])) {
-            foreach ($blockIds[1] as $blockId) {
-                if (!isset($this->blocksMapping[$blockId])) {
-                    $block = $this->blockRepository->getById($blockId);
-                    $this->blocksMapping[$blockId] = $block->getIdentifier();
+            $searchCriteria = $this->criteriaBuilder;
+            $searchCriteria->addFilter('block_id', $blockIds[1], 'in');
+            $blocksList = $this->blockRepository->getList($searchCriteria->create());
+            $blocks = $blocksList->getItems();
+            foreach ($blocks as $block) {
+                if (!isset($this->blocksMapping[$block->getId()])) {
+                    $this->blocksMapping[$block->getId()] = $block->getIdentifier();
                 }
+            }
+            foreach ($blockIds[1] as $blockId) {
                 $identifier = $this->blocksMapping[$blockId];
                 $content = str_replace("block_id=\"$blockId\"", "block_id=\"$identifier\"", $content);
             }
