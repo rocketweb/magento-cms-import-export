@@ -1,20 +1,26 @@
 # CMS Import/Export Tool
 A tool to manage CMS content (both blocks &amp; pages) being imported/exported between environments using the repository. This tool comes handy for build and maintenance projects.
 
-## Installation
-Using composer:
-```
-composer2 require rocketweb/module-cms-import-export
-```
-
-Once the tool is installed, we have two workflows, depending on what we are trying to do.
-
 > Ideas for using this:
 > - allowing FED team to create a CMS block/page in admin but then modify the HTML content using proper IDEs that allow auto-complete & code-styling
 > - allowing simpler deployments since there is no manual copy/paste of CMS data needed
 > - allowing the client to modify staging content and having it ready for deployment
 > - having an easy way to sync up production env to staging/dev/local by exporting on production and importing on 
   staging/dev/local
+
+## Installation
+Using composer:
+```
+composer require rocketweb/module-cms-import-export
+```
+
+Then enable module:
+```
+bin/magento module:enable RocketWeb_CmsImportExport
+```
+
+
+Once the tool is installed, we have two workflows, depending on what we are trying to do.
 
 ## Export
 
