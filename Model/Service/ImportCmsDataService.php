@@ -107,7 +107,7 @@ class ImportCmsDataService
             }
             $identifier = str_replace($dirPath, '', $filePath);
             $identifier = str_replace('.html', '', $identifier);
-            $identifier = substr_replace($identifier, '', strpos($identifier, '|'));
+            $identifier = substr_replace($identifier, '', strpos($identifier, '---'));
             if ($identifiers !== null && !in_array($identifier, $identifiers)) {
                 // If we have a list of items, we skip if its not in the list
                 continue;
@@ -140,7 +140,7 @@ class ImportCmsDataService
             try {
                 $this->blockRepository->save($block);
             } catch (\Exception $exception) {
-                echo $exception->getMessage() . ' | Block ID: ' . $identifier . "\n";
+                echo $exception->getMessage() . ', Block ID: ' . $identifier . "\n";
             }
         }
     }
@@ -155,8 +155,8 @@ class ImportCmsDataService
             }
             $identifier = str_replace($dirPath, '', $filePath);
             $identifier = str_replace('.html', '', $identifier);
-            $identifier = substr_replace($identifier, '', strpos($identifier, '|'));
-            $identifier = str_replace('|', '/', $identifier);
+            $identifier = substr_replace($identifier, '', strpos($identifier, '---'));
+            $identifier = str_replace('---', '/', $identifier);
             $identifier = str_replace('_html', '.html', $identifier);
             if ($identifiers !== null && !in_array($identifier, $identifiers)) {
                 // If we have a list of items, we skip if its not in the list
