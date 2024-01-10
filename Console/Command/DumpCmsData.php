@@ -63,7 +63,7 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
         parent::configure();
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): void
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $type = $input->getOption(self::INPUT_KEY_TYPE);
         $removeAll = (bool)$input->getOption(self::INPUT_KEY_REMOVE_ALL);
@@ -87,5 +87,7 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
         }
 
         $this->dumpCmsDataService->execute($types, $identifiers, $removeAll);
+
+        return 0;
     }
 }

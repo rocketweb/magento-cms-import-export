@@ -65,7 +65,7 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
         parent::configure();
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): void
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $type = $input->getOption(self::INPUT_KEY_TYPE);
         $importAll = (bool)$input->getOption(self::INPUT_KEY_IMPORT_ALL);
@@ -89,5 +89,7 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
         }
 
         $this->importCmsDataService->execute($types, $identifiers, $importAll);
+
+        return 0;
     }
 }
