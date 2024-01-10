@@ -136,16 +136,16 @@ class DumpCmsDataService
         $pages = $pagesList->getItems();
 
         foreach ($pages as $page) {
-            $identifier = str_replace('/', '|', trim($page->getIdentifier()));
+            $identifier = str_replace('/', '---', trim($page->getIdentifier()));
             if (strpos($identifier, '.html') !== false) {
                 $identifier = str_replace('.html', '_html', $identifier);
             }
 
             $storeCodes = $this->getStoreCodes($page->getStores());
-            $htmlPath = $path . $identifier . '|' . implode('|', $storeCodes) . '.html';
+            $htmlPath = $path . $identifier . '---' . implode('---', $storeCodes) . '.html';
             $pageContent = $this->replaceBlockIds($page->getContent());
             $this->write($varDirectory, $htmlPath, $pageContent);
-            $jsonPath = $path . $identifier . '|' . implode('|', $storeCodes) . '.json';
+            $jsonPath = $path . $identifier . '---' . implode('---', $storeCodes) . '.json';
             $jsonContent = [
                 'title' => $page->getTitle(),
                 'is_active' => $page->isActive(),
@@ -181,9 +181,9 @@ class DumpCmsDataService
             }
             $this->blockIdentifiers[$block->getId()] = $block->getIdentifier();
             $storeCodes = $this->getStoreCodes($block->getStores());
-            $htmlPath = $path . trim($block->getIdentifier()) . '|' . implode('|', $storeCodes) . '.html';
+            $htmlPath = $path . trim($block->getIdentifier()) . '---' . implode('---', $storeCodes) . '.html';
             $this->write($varDirectory, $htmlPath, $block->getContent());
-            $jsonPath = $path . trim($block->getIdentifier()) . '|' . implode('|', $storeCodes) . '.json';
+            $jsonPath = $path . trim($block->getIdentifier()) . '---' . implode('---', $storeCodes) . '.json';
             $jsonContent = [
                 'title' => $block->getTitle(),
                 'identifier' => $block->getIdentifier(),
