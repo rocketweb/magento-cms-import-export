@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Rocketweb\CmsImportExport\Test\Integration;
+namespace RocketWeb\CmsImportExport\Test\Integration;
 
 use Magento\Framework\Exception\FileSystemException;
 use Magento\TestFramework\App\Filesystem;

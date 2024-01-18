@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Rocketweb\CmsImportExport\Test\Integration;
+namespace RocketWeb\CmsImportExport\Test\Integration;
 
 use Magento\Cms\Api\BlockRepositoryInterface;
 use Magento\Cms\Api\GetBlockByIdentifierInterface;
@@ -22,8 +22,8 @@ use RocketWeb\CmsImportExport\Model\Service\ImportCmsDataService;
  * @magentoAppIsolation enabled
  * @magentoDbIsolation enabled
  * @magentoAppArea adminhtml
- * @magentoDataFixture Rocketweb_CmsImportExport::_files/custom_block.php
- * @magentoDataFixture Rocketweb_CmsImportExport::_files/custom_page.php
+ * @magentoDataFixture RocketWeb_CmsImportExport::_files/custom_block.php
+ * @magentoDataFixture RocketWeb_CmsImportExport::_files/custom_page.php
  */
 class ImportEntitiesTest extends TestCase
 {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Rocketweb\CmsImportExport\Test\Integration;
+namespace RocketWeb\CmsImportExport\Test\Integration;
 
 use Magento\Cms\Api\BlockRepositoryInterface;
 use Magento\Cms\Api\PageRepositoryInterface;
@@ -68,7 +68,7 @@ class ImportByStoreScopeEntitiesTest extends TestCase
      * @param array $scopes
      * @return void
      * @magentoAppArea adminhtml
-     * @magentoDataFixture Rocketweb_CmsImportExport::_files/multiple_websites_with_store_groups_stores.php
+     * @magentoDataFixture RocketWeb_CmsImportExport::_files/multiple_websites_with_store_groups_stores.php
      * @dataProvider getExecuteCases
      * @throws \Exception
      */

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Rocketweb\CmsImportExport\Test\Integration;
+namespace RocketWeb\CmsImportExport\Test\Integration;
 
 use Magento\Framework\Exception\FileSystemException;
 use Magento\Store\Model\StoreManagerInterface;
@@ -55,10 +55,10 @@ class ExportByStoreScopeEntitiesTest extends TestCase
      * @param array $scopes
      * @return void
      * @throws FileSystemException
-     * @magentoDataFixture Rocketweb_CmsImportExport::_files/multiple_websites_with_store_groups_stores.php
+     * @magentoDataFixture RocketWeb_CmsImportExport::_files/multiple_websites_with_store_groups_stores.php
      * @dataProvider getExecuteCases
-     * @magentoDataFixture Rocketweb_CmsImportExport::_files/multi_store_block.php
-     * @magentoDataFixture Rocketweb_CmsImportExport::_files/multi_store_page.php
+     * @magentoDataFixture RocketWeb_CmsImportExport::_files/multi_store_block.php
+     * @magentoDataFixture RocketWeb_CmsImportExport::_files/multi_store_page.php
      */
     public function testCmsExportedCorrectlyByScope(
         string $type,
