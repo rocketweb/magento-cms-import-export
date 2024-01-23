@@ -1,0 +1,43 @@
+name: RW Integration Tests
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+jobs:
+  integration-tests:
+    name: Magento 2 Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_SQL_TO_RUN: 'GRANT ALL ON *.* TO "root"@"%";'
+        ports:
+          - 3306:3306
+        options: --tmpfs /tmp:rw --tmpfs /var/lib/mysql:rw --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      es:
+        image: docker.io/wardenenv/elasticsearch:7.8
+        ports:
+          - 9200:9200
+        env:
+          'discovery.type': single-node
+          'xpack.security.enabled': false
+          ES_JAVA_OPTS: "-Xms64m -Xmx512m"
+        options: --health-cmd="curl localhost:9200/_cluster/health?wait_for_status=yellow&timeout=60s" --health-interval=10s --health-timeout=5s --health-retries=3
+    steps:
+      - uses: actions/checkout@v4
+      - name: M2 Integration Tests with Magento 2 (Php8.1)
+        uses: extdn/github-actions-m2/magento-integration-tests/8.1@master
+        with:
+          MAGENTO_PRE_INSTALL_SCRIPT: ./githubscripts/integration/pre-install-script.sh
+          MAGENTO_POST_INSTALL_SCRIPT: ./githubscripts/integration/post-install-script.sh
+          MODULE_NAME: RocketWeb_CmsImportExport
+          COMPOSER_NAME: rocketweb/module-cms-import-export
+          MAGENTO_VERSION: '2.4.5-p5'
+          PHPUNIT_FILE: './vendor/rocketweb/module-cms-import-export/phpunit.rw.xml'
+          COMPOSER_VERSION: 2
