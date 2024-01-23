@@ -6,6 +6,10 @@
     "php": "^7.4|^8.0",
     "magento/module-cms": "104.0.*"
   },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5",
+    "reach-digital/magento2-test-framework": "^1.7"
+  },
   "license": [
     "OSL-3.0",
     "AFL-3.0"
