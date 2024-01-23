@@ -19,14 +19,14 @@ $pageRepository = $objectManager->create(PageRepositoryInterface::class);
 $store = $objectManager->create(Store::class);
 $store->load('second_store_view', 'code');
 $page = $pageFactory->create();
-$page->load('import_gopher_cms_page_multistore', 'identifier');
+$page->load('imported_cms_page_multistore', 'identifier');
 if ($page->getId()) {
     $pageRepository->delete($page);
     $page = $pageFactory->create();
 }
 
 $page->setTitle('Cms Page 100')
-    ->setIdentifier('import_gopher_cms_page_multistore')
+    ->setIdentifier('imported_cms_page_multistore')
     ->setStores([1, (int)$store->getId()])
     ->setIsActive(1)
     ->setContent('<h1>Cms Page 100 Title</h1>')

@@ -53,8 +53,8 @@ class ImportEntitiesTest extends TestCase
     public function getExecuteCases(): array
     {
         return [
-            ['block', 'import_gopher_cms_block'],
-            ['page', 'import_gopher_cms_page'],
+            ['block', 'imported_cms_block'],
+            ['page', 'imported_cms_page'],
         ];
     }
 
@@ -127,7 +127,7 @@ class ImportEntitiesTest extends TestCase
      */
     private function deleteTestBlock(): void
     {
-        $block = $this->getBlock->execute('import_gopher_cms_block', 1);
+        $block = $this->getBlock->execute('imported_cms_block', 1);
         $this->blockRepository->delete($block);
     }
 
@@ -138,7 +138,7 @@ class ImportEntitiesTest extends TestCase
      */
     private function deleteTestPage(): void
     {
-        $page = $this->getPage->execute('import_gopher_cms_page', 1);
+        $page = $this->getPage->execute('imported_cms_page', 1);
         $this->pageRepository->delete($page);
     }
 }

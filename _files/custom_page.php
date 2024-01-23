@@ -16,7 +16,7 @@ $page = $objectManager->create(Page::class);
 $pageRepository = $objectManager->create(PageRepositoryInterface::class);
 
 $page->setTitle('Cms Page 100')
-    ->setIdentifier('import_gopher_cms_page')
+    ->setIdentifier('imported_cms_page')
     ->setStores([1])
     ->setIsActive(1)
     ->setContent('<h1>Cms Page 100 Title</h1>')

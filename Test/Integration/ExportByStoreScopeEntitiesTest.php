@@ -44,8 +44,8 @@ class ExportByStoreScopeEntitiesTest extends TestCase
     public function getExecuteCases(): array
     {
         return [
-            ['block', 'import_gopher_cms_block_multistore', ['default', 'second_store_view']],
-            ['page', 'import_gopher_cms_page_multistore', ['default', 'second_store_view']],
+            ['block', 'imported_cms_block_multistore', ['default', 'second_store_view']],
+            ['page', 'imported_cms_page_multistore', ['default', 'second_store_view']],
         ];
     }
 

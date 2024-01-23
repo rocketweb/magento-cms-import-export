@@ -57,8 +57,8 @@ class ImportByStoreScopeEntitiesTest extends TestCase
     public function getExecuteCases(): array
     {
         return [
-            ['block', 'import_gopher_cms_block_multistore', ['second_store_view']],
-            ['page', 'import_gopher_cms_page_multistore', ['second_store_view']],
+            ['block', 'imported_cms_block_multistore', ['second_store_view']],
+            ['page', 'imported_cms_page_multistore', ['second_store_view']],
         ];
     }
 
@@ -124,13 +124,13 @@ class ImportByStoreScopeEntitiesTest extends TestCase
             $this->varDirectory->create($this->exportDirPath);
         }
 
-        $blockContent = '{"title":"CMS Block Title","identifier":"import_gopher_cms_block_multistore","stores":["second_store_view"],"is_active":true,"is_tailwindcss_jit_enabled":"1"}';
+        $blockContent = '{"title":"CMS Block Title","identifier":"imported_cms_block_multistore","stores":["second_store_view"],"is_active":true,"is_tailwindcss_jit_enabled":"1"}';
         $blockHtmlContent = '<h1>Fixture Block Title</h1>
 <a href="{{store url=""}}">store url</a>
 <p>Config value: "{{config path="web/unsecure/base_url"}}".</p>
 <p>Custom variable: "{{customvar code="variable_code"}}".</p>
 ';
-        $pageContent = '{"title":"Cms Page 100","is_active":true,"page_layout":"1column","identifier":"import_gopher_cms_page_multistore","stores":["second_store_view"],"content_heading":"<h2>Cms Page 100 Title<\/h2>","is_tailwindcss_jit_enabled":"1"}';
+        $pageContent = '{"title":"Cms Page 100","is_active":true,"page_layout":"1column","identifier":"imported_cms_page_multistore","stores":["second_store_view"],"content_heading":"<h2>Cms Page 100 Title<\/h2>","is_tailwindcss_jit_enabled":"1"}';
         $pageHtmlContent = '<h1>Cms Page 100 Title</h1>';
         $jsonFilename = sprintf(
             "$identifier---%s.json",

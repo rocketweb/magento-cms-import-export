@@ -19,7 +19,7 @@ $blockRepository = $objectManager->create(BlockRepositoryInterface::class);
 $store = $objectManager->create(Store::class);
 $store->load('second_store_view', 'code');
 $block = $blockFactory->create();
-$block->load('import_gopher_cms_block_multistore', 'identifier');
+$block->load('imported_cms_block_multistore', 'identifier');
 if ($block->getId()) {
     $blockRepository->delete($block);
     $block = $blockFactory->create();
@@ -28,7 +28,7 @@ if ($block->getId()) {
 $block->setTitle(
     'CMS Block Title'
 )->setIdentifier(
-    'import_gopher_cms_block_multistore'
+    'imported_cms_block_multistore'
 )->setContent(
     '<h1>Fixture Block Title</h1>
 <a href="{{store url=""}}">store url</a>

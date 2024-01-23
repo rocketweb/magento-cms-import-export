@@ -19,7 +19,7 @@ $blockRepository = $objectManager->create(BlockRepositoryInterface::class);
 $block->setTitle(
     'CMS Block Title'
 )->setIdentifier(
-    'import_gopher_cms_block'
+    'imported_cms_block'
 )->setContent(
     '<h1>Fixture Block Title</h1>
 <a href="{{store url=""}}">store url</a>
