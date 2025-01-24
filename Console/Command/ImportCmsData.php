@@ -28,6 +28,7 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
     private const INPUT_TYPE_VALUES = ['block', 'page', 'all'];
     private const INPUT_KEY_IDENTIFIER = 'identifier';
     private const INPUT_KEY_IMPORT_ALL = 'importAll';
+    private const INPUT_KEY_STORE = 'store';
     private \RocketWeb\CmsImportExport\Model\Service\ImportCmsDataService $importCmsDataService;
 
     public function __construct(
@@ -60,6 +61,12 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
                 'a',
                 InputOption::VALUE_NONE,
                 'Flag to import all files'
+            ),
+            new InputOption(
+                self::INPUT_KEY_STORE,
+                's',
+                InputOption::VALUE_OPTIONAL,
+                'Specific Store Code'
             )
         ]);
         parent::configure();
@@ -88,7 +95,11 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
             $identifiers = explode(',', $identifiers);
         }
 
-        $this->importCmsDataService->execute($types, $identifiers, $importAll);
+        $storeCode = empty($input->getOption(self::INPUT_KEY_STORE)) ?
+            null :
+            $input->getOption(self::INPUT_KEY_STORE);
+
+        $this->importCmsDataService->execute($types, $identifiers, $importAll, $storeCode);
 
         return 0;
     }
