@@ -17,6 +17,8 @@
 
 namespace RocketWeb\CmsImportExport\Model\Service;
 
+use Magento\Cms\Api\Data\BlockInterface;
+use Magento\Cms\Api\Data\PageInterface;
 use Magento\Framework\App\Filesystem\DirectoryList;
 
 class ImportCmsDataService
@@ -53,7 +55,7 @@ class ImportCmsDataService
         $this->storeRepository = $storeRepository;
     }
 
-    public function execute(array $types, ?array $identifiers, bool $importAll, ?string $storeCode)
+    public function execute(array $types, ?array $identifiers, bool $importAll, ?string $storeCode = null)
     {
         $workingDirPath = 'sync_cms_data';
 
@@ -116,6 +118,12 @@ class ImportCmsDataService
             }
             if ($storeCode !== null && ($this->getStoreCode($filePath) !== $storeCode)) {
                 // Skip identifiers not assigned to specific store when storeCode parameter is set
+                echo sprintf(
+                    'Skipping identifier %s because requested update only for store %s %s',
+                    $identifier,
+                    $storeCode,
+                    PHP_EOL
+                );
                 continue;
             }
 
@@ -173,6 +181,12 @@ class ImportCmsDataService
 
             if ($storeCode !== null && ($this->getStoreCode($filePath) !== $storeCode)) {
                 // Skip identifiers not assigned to specific store when storeCode parameter is set
+                echo sprintf(
+                    'Skipping identifier %s because requested update only for store %s %s',
+                    $identifier,
+                    $storeCode,
+                    PHP_EOL
+                );
                 continue;
             }
 
@@ -212,13 +226,23 @@ class ImportCmsDataService
         }
     }
 
+    /**
+     * We are validating here is store association is correct
+     * string $filePath - HTML filename, may contain either store code or _all_
+     * BlockInterface | PageInterface $entity - either block or page if already exists
+     * array $storeIds - array of stores to associate from JSON file
+     * string $entityType - either "block" or "page", for accurate messaging
+     *
+     * We load store by store code specified in $filePath
+     * Further we validate it against the data we have in JSON and if currently existing block/page
+     */
     private function validateStoreAssociation(
         string $filePath,
-        mixed $entity,
+        BlockInterface | PageInterface $entity,
         array $storeIds,
         string $entityType
     ) : void {
-        $exceptionMessage = sprintf('%s with path %s has incosistent store data', $entityType, $filePath);
+        $exceptionMessage = sprintf('%s with path %s has inconsistent store data', $entityType, $filePath);
         if (count($storeIds) > 1) {
             throw new \LogicException($exceptionMessage);
         }
