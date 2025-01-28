@@ -17,6 +17,8 @@
 
 namespace RocketWeb\CmsImportExport\Model\Service;
 
+use Magento\Cms\Api\Data\BlockInterface;
+use Magento\Cms\Api\Data\PageInterface;
 use Magento\Framework\App\Filesystem\DirectoryList;
 
 class ImportCmsDataService
@@ -39,7 +41,9 @@ class ImportCmsDataService
         \Magento\Framework\Filesystem\DirectoryList $directoryList,
         \Magento\Framework\Filesystem $filesystem,
         \Magento\Framework\Serialize\SerializerInterface $serializer,
-        \Magento\Store\Api\StoreRepositoryInterface $storeRepository
+        \Magento\Store\Api\StoreRepositoryInterface $storeRepository,
+        private readonly \Magento\Cms\Api\GetBlockByIdentifierInterface $getBlockByIdentifier,
+        private readonly \Magento\Cms\Api\GetPageByIdentifierInterface $getPageByIdentifier
     ) {
         $this->pageRepository = $pageRepository;
         $this->blockRepository = $blockRepository;
@@ -51,7 +55,7 @@ class ImportCmsDataService
         $this->storeRepository = $storeRepository;
     }
 
-    public function execute(array $types, ?array $identifiers, bool $importAll)
+    public function execute(array $types, ?array $identifiers, bool $importAll, ?string $storeCode = null)
     {
         $workingDirPath = 'sync_cms_data';
 
@@ -70,9 +74,9 @@ class ImportCmsDataService
             }
 
             if ($type == 'block') {
-                $this->importBlocks($typeDirPath, $identifiers);
+                $this->importBlocks($typeDirPath, $identifiers, $storeCode);
             } else if ($type == 'page') {
-                $this->importPages($typeDirPath, $identifiers);
+                $this->importPages($typeDirPath, $identifiers, $storeCode);
             }
         }
     }
@@ -97,7 +101,7 @@ class ImportCmsDataService
         return $storeIds;
     }
 
-    private function importBlocks(string $dirPath, ?array $identifiers): void
+    private function importBlocks(string $dirPath, ?array $identifiers, ?string $storeCode = null): void
     {
         $filePaths = $this->directoryRead->read($this->varPath . $dirPath);
         foreach ($filePaths as $filePath) {
@@ -112,12 +116,17 @@ class ImportCmsDataService
                 // If we have a list of items, we skip if its not in the list
                 continue;
             }
-
-            try {
-                $block = $this->blockRepository->getById($identifier);
-            } catch (\Magento\Framework\Exception\NoSuchEntityException $exception) {
-                $block = $this->blockFactory->create();
+            if ($storeCode !== null && ($this->getStoreCode($filePath) !== $storeCode)) {
+                // Skip identifiers not assigned to specific store when storeCode parameter is set
+                echo sprintf(
+                    'Skipping identifier %s because requested update only for store %s %s',
+                    $identifier,
+                    $storeCode,
+                    PHP_EOL
+                );
+                continue;
             }
+
             $content = $this->directoryRead->readFile($filePath);
             $jsonData = $this->directoryRead->readFile(str_replace('.html', '.json', $filePath));
             $jsonData = $this->serializer->unserialize($jsonData);
@@ -128,6 +137,13 @@ class ImportCmsDataService
                 'is_active' => $block->isActive()
             ];*/
             $storeIds = $this->getStoreIds($jsonData['stores']);
+            try {
+                $block = $this->getBlockByIdentifier->execute($identifier, (int)reset($storeIds));
+                $this->validateStoreAssociation($filePath, $block, $storeIds, 'Block');
+            } catch (\Magento\Framework\Exception\NoSuchEntityException $exception) {
+                $block = $this->blockFactory->create();
+            }
+
             $block->setTitle($jsonData['title']);
             $block->setContent($content);
             $block->setIdentifier($jsonData['identifier']);
@@ -145,7 +161,7 @@ class ImportCmsDataService
         }
     }
 
-    private function importPages(string $dirPath, ?array $identifiers): void
+    private function importPages(string $dirPath, ?array $identifiers, ?string $storeCode = null): void
     {
         $filePaths = $this->directoryRead->read($this->varPath . $dirPath);
         foreach ($filePaths as $filePath) {
@@ -155,7 +171,7 @@ class ImportCmsDataService
             }
             $identifier = str_replace($dirPath, '', $filePath);
             $identifier = str_replace('.html', '', $identifier);
-            $identifier = substr_replace($identifier, '', strpos($identifier, '---'));
+            $identifier = substr_replace($identifier, '', strrpos($identifier, '---'));
             $identifier = str_replace('---', '/', $identifier);
             $identifier = str_replace('_html', '.html', $identifier);
             if ($identifiers !== null && !in_array($identifier, $identifiers)) {
@@ -163,15 +179,27 @@ class ImportCmsDataService
                 continue;
             }
 
-            try {
-                $page = $this->pageRepository->getById($identifier);
-            } catch (\Magento\Framework\Exception\NoSuchEntityException $exception) {
-                $page = $this->pageFactory->create();
+            if ($storeCode !== null && ($this->getStoreCode($filePath) !== $storeCode)) {
+                // Skip identifiers not assigned to specific store when storeCode parameter is set
+                echo sprintf(
+                    'Skipping identifier %s because requested update only for store %s %s',
+                    $identifier,
+                    $storeCode,
+                    PHP_EOL
+                );
+                continue;
             }
+
             $content = $this->directoryRead->readFile($filePath);
             $jsonData = $this->directoryRead->readFile(str_replace('.html', '.json', $filePath));
             $jsonData = $this->serializer->unserialize($jsonData);
             $storeIds = $this->getStoreIds($jsonData['stores']);
+            try {
+                $page = $this->getPageByIdentifier->execute($identifier, (int)reset($storeIds));
+                $this->validateStoreAssociation($filePath, $page, $storeIds, 'Page');
+            } catch (\Magento\Framework\Exception\NoSuchEntityException $exception) {
+                $page = $this->pageFactory->create();
+            }
             /*$jsonContent = [
                 'title' => $page->getTitle(),
                 'is_active' => $page->isActive(),
@@ -193,8 +221,54 @@ class ImportCmsDataService
             try {
                 $this->pageRepository->save($page);
             } catch (\Exception $exception) {
-                echo $exception->getMessage() . ' | Block ID: ' . $identifier . "\n";
+                echo $exception->getMessage() . ' | Page ID: ' . $identifier . "\n";
             }
         }
+    }
+
+    /**
+     * We are validating here is store association is correct
+     * string $filePath - HTML filename, may contain either store code or _all_
+     * BlockInterface | PageInterface $entity - either block or page if already exists
+     * array $storeIds - array of stores to associate from JSON file
+     * string $entityType - either "block" or "page", for accurate messaging
+     *
+     * We load store by store code specified in $filePath
+     * Further we validate it against the data we have in JSON and if currently existing block/page
+     */
+    private function validateStoreAssociation(
+        string $filePath,
+        BlockInterface | PageInterface $entity,
+        array $storeIds,
+        string $entityType
+    ) : void {
+        $exceptionMessage = sprintf('%s with path %s has inconsistent store data', $entityType, $filePath);
+        if (count($storeIds) > 1) {
+            throw new \LogicException($exceptionMessage);
+        }
+        $storeCode = $this->getStoreCode($filePath);
+        $storeId = (int)reset($storeIds);
+        $currentStoreIds = $entity->getStoreId();
+        if ($storeCode === '_all_') {
+            if ($storeId !== 0 || count($currentStoreIds) > 1 || (int)reset($currentStoreIds) !== 0) {
+                throw new \LogicException($exceptionMessage);
+            }
+            return ;
+        }
+        $store = $this->storeRepository->get($storeId);
+        if ($store->getCode() !== $storeCode) {
+            throw new \LogicException($exceptionMessage);
+        }
+
+        if (array_diff($currentStoreIds, $storeIds) !== []) {
+            throw new \LogicException($exceptionMessage);
+        }
+    }
+
+    private function getStoreCode(string $filePath) : string
+    {
+        $storeCode = str_replace('.html', '', $filePath);
+        $storeCode = substr($storeCode, strrpos($storeCode, '---') + 3);
+        return $storeCode;
     }
 }
