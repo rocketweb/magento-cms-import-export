@@ -101,7 +101,7 @@ class ImportCmsDataService
         return $storeIds;
     }
 
-    private function importBlocks(string $dirPath, ?array $identifiers, ?string $storeCode): void
+    private function importBlocks(string $dirPath, ?array $identifiers, ?string $storeCode = null): void
     {
         $filePaths = $this->directoryRead->read($this->varPath . $dirPath);
         foreach ($filePaths as $filePath) {
@@ -161,7 +161,7 @@ class ImportCmsDataService
         }
     }
 
-    private function importPages(string $dirPath, ?array $identifiers, ?string $storeCode): void
+    private function importPages(string $dirPath, ?array $identifiers, ?string $storeCode = null): void
     {
         $filePaths = $this->directoryRead->read($this->varPath . $dirPath);
         foreach ($filePaths as $filePath) {
@@ -221,7 +221,7 @@ class ImportCmsDataService
             try {
                 $this->pageRepository->save($page);
             } catch (\Exception $exception) {
-                echo $exception->getMessage() . ' | Block ID: ' . $identifier . "\n";
+                echo $exception->getMessage() . ' | Page ID: ' . $identifier . "\n";
             }
         }
     }

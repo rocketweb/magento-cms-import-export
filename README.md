@@ -80,18 +80,21 @@ Import cms pages/blocks from var/sync_cms_data
 Options:
 -t, --type=TYPE                Which type are we importing - block/page/all
 -i, --identifier[=IDENTIFIER]  identifier to process (one or CSV list)
+-a, --importAll                Flag to import all files
+-s, --store[STORE_CODE]        Store code to process only pages/blocks specific to this store
 ```
 
 This command works by using files in `var/sync_cms_data/cms/` path. As you can see from the options, we need to define:
-- type - which can be CMS block, CMS page or both - **required**
+- type - which can be CMS block or CMS page - **required**
 - identifier - either a CMS block or CMS page identifier - **optional**
-
+There are optional parameters:
+- importAll - when identifiers not specified we'll import all blocks or pages
+- store - store code (like default) to import block(s)/pages(s) only for specific store
 With the combination of these two, we can **import**:
-- all CMS content (using --type=all)
-- all CMS pages (using --type=page)
-- all CMS blocks (using --type=block)
-- specific CMS page or pages (using --type=page --identifier=about-us.html,homepage-new)
+- all CMS pages (using --type=page and importAll)
+- all CMS blocks (using --type=block and importAll)
+- specific CMS page or pages (using --type=page --identifier=about-us,homepage-new)
 - specific CMS block or blocks (using --type=block --identifier=who-are-we,homepage-carousel)
-
+- specific CMS page by store (using --type=page --identifier=about-us-default --store=default)
 Once you execute the command, the content will be created/updated in Magento Admin. 
 By executing `php bin/magento cache:flush` you should be able to see the updated CMS content on frontend also!
