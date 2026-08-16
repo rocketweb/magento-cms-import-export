@@ -49,10 +49,16 @@ class ContentReader
 
     /**
      * Whether Hyva CMS is installed and its content can be read at all.
+     *
+     * Every type this class resolves is checked, not just the first one. The repositories live in Hyva_CmsMagento
+     * and JitCssRepository lives in Hyva_CmsLiveviewEditor, and a single check covers both only for as long as
+     * the two keep shipping inside one package.
      */
     public function isAvailable(): bool
     {
-        return interface_exists(self::PAGE_REPOSITORY);
+        return interface_exists(self::PAGE_REPOSITORY)
+            && interface_exists(self::BLOCK_REPOSITORY)
+            && class_exists(self::JIT_CSS_REPOSITORY);
     }
 
     /**

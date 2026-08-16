@@ -60,10 +60,17 @@ class ContentWriter
 
     /**
      * Whether Hyva CMS is installed and its content can be written at all.
+     *
+     * Every type this class resolves is checked, not just the first one. The repositories live in Hyva_CmsMagento
+     * while Provider and JitCssRepository live in Hyva_CmsLiveviewEditor, and a single check covers both only for
+     * as long as the two keep shipping inside one package.
      */
     public function isAvailable(): bool
     {
-        return interface_exists(self::PAGE_REPOSITORY);
+        return interface_exists(self::PAGE_REPOSITORY)
+            && interface_exists(self::BLOCK_REPOSITORY)
+            && class_exists(self::PROVIDER)
+            && class_exists(self::JIT_CSS_REPOSITORY);
     }
 
     /**
@@ -160,6 +167,12 @@ class ContentWriter
      */
     private function writeFlags(string $entityType, int $entityId, array $payload): void
     {
+        $hasLiveviewFlag = array_key_exists('is_liveview_enabled', $payload);
+        $hasJitFlag = array_key_exists('is_tailwindcss_jit_enabled', $payload);
+        if (!$hasLiveviewFlag && !$hasJitFlag) {
+            return;
+        }
+
         $isPage = $entityType === self::ENTITY_TYPE_PAGE;
         $repository = $this->objectManager->get($isPage ? self::PAGE_REPOSITORY : self::BLOCK_REPOSITORY);
         $entity = $isPage ? $repository->getByCmsPageId($entityId) : $repository->getByCmsBlockId($entityId);
@@ -167,11 +180,11 @@ class ContentWriter
             return;
         }
 
-        if (array_key_exists('is_liveview_enabled', $payload)) {
+        if ($hasLiveviewFlag) {
             $entity->setIsLiveviewEnabled((bool)$payload['is_liveview_enabled']);
         }
 
-        if (array_key_exists('is_tailwindcss_jit_enabled', $payload)) {
+        if ($hasJitFlag) {
             $entity->setIsTailwindcssJitEnabled((bool)$payload['is_tailwindcss_jit_enabled']);
         }
 
