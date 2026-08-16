@@ -34,6 +34,11 @@ use Magento\Theme\Model\ResourceModel\Theme\CollectionFactory as ThemeCollection
  * A missing table is treated as "nothing of that kind exists" rather than as a reason to skip the check, because
  * Hyva_MenuBuilder and Hyva_CmsInstanceComponents ship separately from the CMS integration this module reads
  * through, and an absent module is precisely the case where the reference cannot resolve.
+ *
+ * A reference only counts as resolved when the target is active. All three kinds render as nothing when they are
+ * disabled, so an inactive target fails exactly like a missing one and has to be reported the same way:
+ * CmsBlockRenderer::renderBlock() returns early on is_active false, Menu\Widget::_beforeToHtml() only renders
+ * inside if ($menu && $menu->isActive()), and an inactive instance component never reaches its template.
  */
 class PayloadValidator
 {
@@ -41,8 +46,8 @@ class PayloadValidator
     private const MENU_TABLE = 'hyva_commerce_cms_menu';
     private const INSTANCE_COMPONENT_TABLE = 'hyva_cms_instance_component';
     private const MISSING_REASON = [
-        ReferenceCollector::KIND_CMS_BLOCK => 'no CMS block carries that identifier',
-        ReferenceCollector::KIND_MENU => 'no Hyva CMS menu carries that identifier',
+        ReferenceCollector::KIND_CMS_BLOCK => 'no active CMS block carries that identifier',
+        ReferenceCollector::KIND_MENU => 'no active Hyva CMS menu carries that identifier',
         ReferenceCollector::KIND_INSTANCE_COMPONENT => 'no active instance component carries that identifier'
     ];
 
@@ -86,20 +91,17 @@ class PayloadValidator
     private function validateReferences(string $entityLabel, array $references): array
     {
         $existing = [
-            ReferenceCollector::KIND_CMS_BLOCK => $this->findExisting(
+            ReferenceCollector::KIND_CMS_BLOCK => $this->findActive(
                 self::CMS_BLOCK_TABLE,
-                $references[ReferenceCollector::KIND_CMS_BLOCK] ?? [],
-                false
+                $references[ReferenceCollector::KIND_CMS_BLOCK] ?? []
             ),
-            ReferenceCollector::KIND_MENU => $this->findExisting(
+            ReferenceCollector::KIND_MENU => $this->findActive(
                 self::MENU_TABLE,
-                $references[ReferenceCollector::KIND_MENU] ?? [],
-                false
+                $references[ReferenceCollector::KIND_MENU] ?? []
             ),
-            ReferenceCollector::KIND_INSTANCE_COMPONENT => $this->findExisting(
+            ReferenceCollector::KIND_INSTANCE_COMPONENT => $this->findActive(
                 self::INSTANCE_COMPONENT_TABLE,
-                $references[ReferenceCollector::KIND_INSTANCE_COMPONENT] ?? [],
-                true
+                $references[ReferenceCollector::KIND_INSTANCE_COMPONENT] ?? []
             )
         ];
 
@@ -124,10 +126,13 @@ class PayloadValidator
     }
 
     /**
+     * All three tables carry an is_active column, and a disabled row renders as nothing just like a missing one,
+     * so the filter applies to every kind rather than to instance components alone.
+     *
      * @param array<int, string> $identifiers
-     * @return array<int, string> the subset of $identifiers that resolves in this install
+     * @return array<int, string> the subset of $identifiers that resolves and is active in this install
      */
-    private function findExisting(string $table, array $identifiers, bool $activeOnly): array
+    private function findActive(string $table, array $identifiers): array
     {
         if ($identifiers === []) {
             return [];
@@ -141,10 +146,8 @@ class PayloadValidator
 
         $select = $connection->select()
             ->from($tableName, ['identifier'])
-            ->where('identifier IN (?)', $identifiers);
-        if ($activeOnly) {
-            $select->where('is_active = ?', 1);
-        }
+            ->where('identifier IN (?)', $identifiers)
+            ->where('is_active = ?', 1);
 
         return array_map('strval', $connection->fetchCol($select));
     }
