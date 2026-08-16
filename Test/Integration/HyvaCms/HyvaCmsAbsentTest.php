@@ -168,6 +168,30 @@ class HyvaCmsAbsentTest extends TestCase
     }
 
     /**
+     * The native content is only redundant for an entity Hyva CMS actually renders. With Hyva absent nothing is
+     * Hyva managed, so every .html has to keep carrying the content it always did.
+     *
+     * @throws FileSystemException
+     * @magentoDataFixture Magento/Cms/_files/block.php
+     * @magentoDataFixture Magento/Cms/_files/noroute.php
+     */
+    public function testNativeContentIsKeptWhenHyvaCmsIsAbsent(): void
+    {
+        $this->exporter->execute(['block', 'page'], null, true, true);
+
+        $htmlFiles = array_filter(
+            $this->readExportTree(),
+            static fn (string $path): bool => str_ends_with($path, '.html'),
+            ARRAY_FILTER_USE_KEY
+        );
+
+        $this->assertNotEmpty($htmlFiles, 'The fixtures must produce html files, or this proves nothing.');
+        foreach ($htmlFiles as $path => $contents) {
+            $this->assertNotSame('', $contents, "$path lost its native content");
+        }
+    }
+
+    /**
      * @return array<string, string> relative path to contents, sorted so comparisons are order independent
      * @throws FileSystemException
      */

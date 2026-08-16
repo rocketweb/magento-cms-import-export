@@ -177,9 +177,13 @@ class DumpCmsDataService
                 $identifier = str_replace('.html', '_html', $identifier);
             }
 
+            $hyvaData = $hyvaCms && $this->hyvaContentReader->isAvailable()
+                ? $this->hyvaContentReader->readPage((int)$page->getId())
+                : null;
+
             $storeCodes = $this->getStoreCodes($page->getStores());
             $htmlPath = $path . $identifier . '---' . implode('---', $storeCodes) . '.html';
-            $pageContent = $this->replaceBlockIds($page->getContent());
+            $pageContent = $hyvaData === null ? $this->replaceBlockIds($page->getContent()) : '';
             $this->write($varDirectory, $htmlPath, $pageContent);
             $jsonPath = $path . $identifier . '---' . implode('---', $storeCodes) . '.json';
             $jsonContent = [
@@ -195,13 +199,10 @@ class DumpCmsDataService
                 $jsonContent['is_tailwindcss_jit_enabled'] = $page->getIsTailwindcssJitEnabled();
             }
             $this->write($varDirectory, $jsonPath, $this->serializer->serialize($jsonContent));
-            if ($hyvaCms && $this->hyvaContentReader->isAvailable()) {
-                $hyvaData = $this->hyvaContentReader->readPage((int)$page->getId());
-                if ($hyvaData !== null) {
-                    $this->warnOnLargeCss($identifier, $hyvaData['tailwindcss']);
-                    $hyvaPath = $path . $identifier . '---' . implode('---', $storeCodes) . '.hyva.json';
-                    $this->write($varDirectory, $hyvaPath, $this->serializer->serialize($hyvaData));
-                }
+            if ($hyvaData !== null) {
+                $this->warnOnLargeCss($identifier, $hyvaData['tailwindcss']);
+                $hyvaPath = $path . $identifier . '---' . implode('---', $storeCodes) . '.hyva.json';
+                $this->write($varDirectory, $hyvaPath, $this->serializer->serialize($hyvaData));
             }
         }
     }
@@ -228,9 +229,13 @@ class DumpCmsDataService
                 continue;
             }
             $this->blockIdentifiers[$block->getId()] = $block->getIdentifier();
+            $hyvaData = $hyvaCms && $this->hyvaContentReader->isAvailable()
+                ? $this->hyvaContentReader->readBlock((int)$block->getId())
+                : null;
+
             $storeCodes = $this->getStoreCodes($block->getStores());
             $htmlPath = $path . trim($block->getIdentifier()) . '---' . implode('---', $storeCodes) . '.html';
-            $this->write($varDirectory, $htmlPath, $block->getContent());
+            $this->write($varDirectory, $htmlPath, $hyvaData === null ? $block->getContent() : '');
             $jsonPath = $path . trim($block->getIdentifier()) . '---' . implode('---', $storeCodes) . '.json';
             $jsonContent = [
                 'title' => $block->getTitle(),
@@ -242,14 +247,11 @@ class DumpCmsDataService
                 $jsonContent['is_tailwindcss_jit_enabled'] = $block->getIsTailwindcssJitEnabled();
             }
             $this->write($varDirectory, $jsonPath, $this->serializer->serialize($jsonContent));
-            if ($hyvaCms && $this->hyvaContentReader->isAvailable()) {
-                $hyvaData = $this->hyvaContentReader->readBlock((int)$block->getId());
-                if ($hyvaData !== null) {
-                    $this->warnOnLargeCss(trim($block->getIdentifier()), $hyvaData['tailwindcss']);
-                    $hyvaPath = $path . trim($block->getIdentifier())
-                        . '---' . implode('---', $storeCodes) . '.hyva.json';
-                    $this->write($varDirectory, $hyvaPath, $this->serializer->serialize($hyvaData));
-                }
+            if ($hyvaData !== null) {
+                $this->warnOnLargeCss(trim($block->getIdentifier()), $hyvaData['tailwindcss']);
+                $hyvaPath = $path . trim($block->getIdentifier())
+                    . '---' . implode('---', $storeCodes) . '.hyva.json';
+                $this->write($varDirectory, $hyvaPath, $this->serializer->serialize($hyvaData));
             }
         }
     }
