@@ -274,6 +274,10 @@ class ImportCmsDataService
      * The write is attempted before the validation so that the warnings describe the state the database is
      * actually left in, and a failed write is reported rather than thrown, because a partial import a human can
      * finish beats an all or nothing one.
+     *
+     * Only the trailing extension is swapped. A block identifier may itself contain ".html", which the block
+     * export writes into the filename verbatim, and replacing every occurrence would point at a file that
+     * does not exist.
      */
     private function importHyvaCms(string $filePath, string $entityType, string $identifier, int $entityId): void
     {
@@ -281,7 +285,7 @@ class ImportCmsDataService
             return;
         }
 
-        $hyvaPath = str_replace('.html', self::HYVA_SUFFIX, $filePath);
+        $hyvaPath = substr_replace($filePath, self::HYVA_SUFFIX, (int)strrpos($filePath, '.html'));
         if (!$this->directoryRead->isExist($hyvaPath)) {
             return;
         }
