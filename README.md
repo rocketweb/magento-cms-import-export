@@ -202,7 +202,12 @@ The importer checks `cms_block`, `menu` and `instance_component` references, war
 total at the end so a warning cannot scroll past unnoticed in a long import. It never fails the import. A partial
 import a human can fix beats an all or nothing one.
 
-### Two things to watch out for
+### Things to watch out for
+
+**Treat these files as code, not as data.** The content and the CSS in a `.hyva.json` reach the storefront without
+escaping, the same way the `.html` sibling always has, so anything in them runs in a visitor's browser. Review a
+sidecar in a pull request the way you would review a template. This is the trust level the tool has always
+operated at, it is only worth stating because CSS looks inert and is not.
 
 **`cms:dump:data -r` without `--hyva-cms` deletes your `.hyva.json` files.** `-r` clears the whole sync directory, and
 a dump without the flag never writes them back. Without `-r` they survive byte identical. The database is untouched
@@ -220,6 +225,12 @@ That applies two sidecars. This applies every one in the sync directory:
 ```
 php bin/magento cms:import:data --type=all --importAll --hyva-cms
 ```
+
+**A block identifier containing `.html` breaks its `.json` sibling.** The page export converts `.html` inside an
+identifier to `_html` before building the filename, but the block export writes the identifier verbatim. So a block
+called `promo.html-banner` exports to `promo.html-banner---_all_.html` and the importer, which swaps the extension,
+has to swap only the trailing one. `--hyva-cms` handles this correctly. The older `.json` path does not, and a block
+named that way loses its title and store assignment on import. Avoid `.html` in a block identifier.
 
 ### Deleting Hyva CMS content
 
