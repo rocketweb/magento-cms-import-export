@@ -8,6 +8,11 @@ A tool to manage CMS content (both blocks &amp; pages) being imported/exported b
 > - having an easy way to sync up production env to staging/dev/local by exporting on production and importing on 
   staging/dev/local
 
+## Requirements
+
+PHP 8.1 or newer. Hyva CMS support is optional: the `--hyva-cms` flag needs `hyva-themes/commerce-module-cms`, and
+without it both commands behave exactly as they always have.
+
 ## Installation
 Using composer:
 ```
@@ -34,8 +39,8 @@ Dumps cms pages/blocks to var/sync_cms_data for further import
 Options:
 -t, --type=TYPE                Which type are we dumping - block/page/all
 -i, --identifier[=IDENTIFIER]  identifier to process (one or CSV list)
--a, --importAll                Flag to import all files
 -r, --removeAll                Flag to remove all existing data
+    --hyva-cms                 Also dump Hyva CMS content and its per-entity Tailwind CSS
 ```
 
 As you can see from the options, we need to define:
@@ -57,12 +62,18 @@ Once you execute the command, you will get the following folder structure:
 ```
 var/sync_cms_data/cms/
 - blocks
-    - %%IDENTIFIER%%.html => contains the block HTML
-    - %%IDENTIFIER%%.json => contains title, is_active, stores information
+    - %%IDENTIFIER%%---%%STORES%%.html => contains the block HTML
+    - %%IDENTIFIER%%---%%STORES%%.json => contains title, is_active, stores information
 - pages
-    - %%IDENTIFIER%%.html => contains the page HTML
-    - %%IDENTIFIER%%.json => contains title, is_ative, page_layou, content_heading
+    - %%IDENTIFIER%%---%%STORES%%.html => contains the page HTML
+    - %%IDENTIFIER%%---%%STORES%%.json => contains title, is_active, page_layout, content_heading
 ```
+
+Every file name carries the store codes the entity is assigned to, joined with `---`. An entity on All Store Views
+renders as `_all_`, so `about-us` on All Store Views becomes `about-us---_all_.html`. A `/` inside an identifier
+becomes `---` and a `.html` suffix becomes `_html`.
+
+With `--hyva-cms` a third file joins each pair. See [Hyva CMS content](#hyva-cms-content) below.
 
 You can modify the HTML directly in your editor which should give you more flexibility.
 
@@ -81,7 +92,8 @@ Options:
 -t, --type=TYPE                Which type are we importing - block/page/all
 -i, --identifier[=IDENTIFIER]  identifier to process (one or CSV list)
 -a, --importAll                Flag to import all files
--s, --store[STORE_CODE]        Store code to process only pages/blocks specific to this store
+-s, --store[=STORE]            Store code to process only pages/blocks specific to this store
+    --hyva-cms                 Also import Hyva CMS content and its per-entity Tailwind CSS
 ```
 
 This command works by using files in `var/sync_cms_data/cms/` path. As you can see from the options, we need to define:
