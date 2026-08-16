@@ -17,8 +17,6 @@
 
 namespace RocketWeb\CmsImportExport\Model\Service\HyvaCms;
 
-use Magento\Framework\ObjectManagerInterface;
-
 /**
  * Writes Hyva CMS content and its per-entity Tailwind CSS back onto an existing native CMS page or block.
  *
@@ -66,8 +64,9 @@ class ContentWriter
      */
     private readonly ?object $jitCssRepository;
 
-    public function __construct(ObjectManagerInterface $objectManager)
-    {
+    public function __construct(
+        \Magento\Framework\ObjectManagerInterface $objectManager
+    ) {
         $hyvaCmsInstalled = interface_exists(self::PAGE_REPOSITORY)
             && interface_exists(self::BLOCK_REPOSITORY)
             && class_exists(self::PROVIDER)

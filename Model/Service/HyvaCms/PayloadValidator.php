@@ -17,9 +17,6 @@
 
 namespace RocketWeb\CmsImportExport\Model\Service\HyvaCms;
 
-use Magento\Framework\App\ResourceConnection;
-use Magento\Theme\Model\ResourceModel\Theme\CollectionFactory as ThemeCollectionFactory;
-
 /**
  * Checks an imported Hyva CMS payload against the install it landed in and reports what will not work.
  *
@@ -48,9 +45,9 @@ class PayloadValidator
     private ?array $registeredThemes = null;
 
     public function __construct(
-        private readonly ReferenceCollector $referenceCollector,
-        private readonly ResourceConnection $resourceConnection,
-        private readonly ThemeCollectionFactory $themeCollectionFactory
+        private readonly \RocketWeb\CmsImportExport\Model\Service\HyvaCms\ReferenceCollector $referenceCollector,
+        private readonly \Magento\Framework\App\ResourceConnection $resourceConnection,
+        private readonly \Magento\Theme\Model\ResourceModel\Theme\CollectionFactory $themeCollectionFactory
     ) {
     }
 

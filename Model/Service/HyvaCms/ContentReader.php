@@ -17,8 +17,6 @@
 
 namespace RocketWeb\CmsImportExport\Model\Service\HyvaCms;
 
-use Magento\Framework\ObjectManagerInterface;
-
 /**
  * Reads Hyva CMS content and its per-entity Tailwind CSS for a native CMS page or block.
  *
@@ -56,8 +54,8 @@ class ContentReader
     private readonly ?object $jitCssRepository;
 
     public function __construct(
-        ObjectManagerInterface $objectManager,
-        private readonly ReferenceCollector $referenceCollector
+        \Magento\Framework\ObjectManagerInterface $objectManager,
+        private readonly \RocketWeb\CmsImportExport\Model\Service\HyvaCms\ReferenceCollector $referenceCollector
     ) {
         $hyvaCmsInstalled = interface_exists(self::PAGE_REPOSITORY)
             && interface_exists(self::BLOCK_REPOSITORY)
