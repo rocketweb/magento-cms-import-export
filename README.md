@@ -167,6 +167,19 @@ The payload carries:
 `references` is diagnostic only. Nothing reads it back on import: the importer re-derives the references from the
 content it actually imported and checks those, so a hand edited file cannot lie about its own dependencies.
 
+### The native content is not exported for a Hyva entity
+
+When `--hyva-cms` is on and an entity is Hyva managed, its `.html` is written empty. The component tree in the
+`.hyva.json` is what the storefront renders, so `cms_page.content` and `cms_block.content` are either empty
+already or left over from whatever built the page before Hyva CMS did. Carrying that is pure weight: six real
+pages in one project held 224 KB of stale HTML against 96 KB of live Hyva content.
+
+The file itself still has to exist, because the importer discovers entities by their `.html`. An entity that is
+not Hyva managed keeps its content as before, flag or no flag, and so does every entity when Hyva CMS is absent.
+
+Import mirrors the source, so promoting a Hyva page clears the native content on the target. That is the intended
+result. If a target holds legacy HTML you want to keep, do not promote that entity.
+
 ### Which Tailwind CSS travels
 
 Hyva CMS writes several `*_tailwindcss` tables. Only the ones a storefront request reads are exported.
