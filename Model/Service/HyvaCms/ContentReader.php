@@ -22,15 +22,14 @@ use Magento\Framework\ObjectManagerInterface;
 /**
  * Reads Hyva CMS content and its per-entity Tailwind CSS for a native CMS page or block.
  *
- * This module must keep running on a plain Magento install where Hyva CMS is absent, so no Hyva class may
- * appear in a type hint, a constructor signature or the module sequence. That leaves lazy resolution through
- * the object manager as the only option, and it is why the service-locator pattern this project otherwise
- * forbids is used here. The exception is confined to this class: callers guard on isAvailable() and receive
- * plain arrays.
+ * Hyva CMS is optional, so no Hyva type may reach a constructor signature or the module sequence: DI resolves
+ * arguments eagerly and would fatal on an install without it. The dependencies are therefore resolved once here,
+ * only when every class is present, and used as ordinary properties afterwards. Absent, they stay null and every
+ * public method returns null. A bridge package requiring hyva-themes/commerce-module-cms would remove this, at
+ * the cost of a second composer package.
  *
- * The Tailwind CSS is read through Hyva\CmsLiveviewEditor\Model\Tailwind\JitCssRepository rather than the
- * PageTailwindcssRepositoryInterface / BlockTailwindcssRepositoryInterface pair, because only the former is
- * aware of the UNIQUE (entity_ref_id, theme, edition) key that the importer has to write back through.
+ * CSS goes through JitCssRepository rather than the Page/BlockTailwindcssRepositoryInterface pair, because only
+ * it knows the UNIQUE (entity_ref_id, theme, edition) key the importer writes back through.
  */
 class ContentReader
 {
@@ -41,35 +40,41 @@ class ContentReader
     private const ENTITY_TYPE_BLOCK = 'cms_block';
     private const EDITIONS = ['published', 'draft'];
 
+    /**
+     * @var \Hyva\CmsMagento\Api\PageRepositoryInterface|null
+     */
+    private readonly ?object $pageRepository;
+
+    /**
+     * @var \Hyva\CmsMagento\Api\BlockRepositoryInterface|null
+     */
+    private readonly ?object $blockRepository;
+
+    /**
+     * @var \Hyva\CmsLiveviewEditor\Model\Tailwind\JitCssRepository|null
+     */
+    private readonly ?object $jitCssRepository;
+
     public function __construct(
-        private readonly ObjectManagerInterface $objectManager,
+        ObjectManagerInterface $objectManager,
         private readonly ReferenceCollector $referenceCollector
     ) {
-    }
-
-    /**
-     * Whether Hyva CMS is installed and its content can be read at all.
-     *
-     * Every type this class resolves is checked, not just the first one. The repositories live in Hyva_CmsMagento
-     * and JitCssRepository lives in Hyva_CmsLiveviewEditor, and a single check covers both only for as long as
-     * the two keep shipping inside one package.
-     */
-    public function isAvailable(): bool
-    {
-        return interface_exists(self::PAGE_REPOSITORY)
+        $hyvaCmsInstalled = interface_exists(self::PAGE_REPOSITORY)
             && interface_exists(self::BLOCK_REPOSITORY)
             && class_exists(self::JIT_CSS_REPOSITORY);
+
+        $this->pageRepository = $hyvaCmsInstalled ? $objectManager->get(self::PAGE_REPOSITORY) : null;
+        $this->blockRepository = $hyvaCmsInstalled ? $objectManager->get(self::BLOCK_REPOSITORY) : null;
+        $this->jitCssRepository = $hyvaCmsInstalled ? $objectManager->get(self::JIT_CSS_REPOSITORY) : null;
+    }
+
+    public function isAvailable(): bool
+    {
+        return $this->pageRepository !== null;
     }
 
     /**
-     * @return array{
-     *     is_liveview_enabled: bool,
-     *     is_tailwindcss_jit_enabled: bool,
-     *     draft_content: string|null,
-     *     published_content: string|null,
-     *     references: array<string, array<int, string>>,
-     *     tailwindcss: array<int, array{theme: string, edition: string, css: string}>
-     * }|null null when Hyva CMS is absent or the page is not Hyva managed
+     * @return array<string, mixed>|null the payload described on buildContent(), null when not Hyva managed
      */
     public function readPage(int $cmsPageId): ?array
     {
@@ -77,7 +82,7 @@ class ContentReader
             return null;
         }
 
-        $page = $this->objectManager->get(self::PAGE_REPOSITORY)->getByCmsPageId($cmsPageId);
+        $page = $this->pageRepository->getByCmsPageId($cmsPageId);
         if ($page === null) {
             return null;
         }
@@ -86,14 +91,7 @@ class ContentReader
     }
 
     /**
-     * @return array{
-     *     is_liveview_enabled: bool,
-     *     is_tailwindcss_jit_enabled: bool,
-     *     draft_content: string|null,
-     *     published_content: string|null,
-     *     references: array<string, array<int, string>>,
-     *     tailwindcss: array<int, array{theme: string, edition: string, css: string}>
-     * }|null null when Hyva CMS is absent or the block is not Hyva managed
+     * @return array<string, mixed>|null the payload described on buildContent(), null when not Hyva managed
      */
     public function readBlock(int $cmsBlockId): ?array
     {
@@ -101,7 +99,7 @@ class ContentReader
             return null;
         }
 
-        $block = $this->objectManager->get(self::BLOCK_REPOSITORY)->getByCmsBlockId($cmsBlockId);
+        $block = $this->blockRepository->getByCmsBlockId($cmsBlockId);
         if ($block === null) {
             return null;
         }
@@ -110,13 +108,14 @@ class ContentReader
     }
 
     /**
-     * Both flags are cast because isLiveviewEnabled() is declared nullable while isTailwindcssJitEnabled() is
-     * not, and the exported payload has to carry the same JSON type for both on every run.
-     *
-     * References are collected from the draft and the published copy together, since a draft may already depend
-     * on an entity the published copy does not, and both editions travel in the same exported file.
+     * Both flags are cast because isLiveviewEnabled() is nullable and isTailwindcssJitEnabled() is not, and the
+     * exported JSON has to carry the same type for both on every run. References cover draft and published
+     * together, since a draft can depend on an entity the published copy does not.
      *
      * @param object $entity Hyva\CmsMagento\Api\Data\PageInterface or BlockInterface
+     * @return array{is_liveview_enabled: bool, is_tailwindcss_jit_enabled: bool, draft_content: string|null,
+     *     published_content: string|null, references: array<string, array<int, string>>,
+     *     tailwindcss: array<int, array{theme: string, edition: string, css: string}>}
      */
     private function buildContent(object $entity, string $entityType, int $entityId): array
     {
@@ -134,18 +133,15 @@ class ContentReader
     }
 
     /**
-     * Rows are sorted by theme then edition so that the exported file stays byte identical between runs and
-     * does not produce phantom diffs in the repository it is committed to.
+     * Sorted so the exported file stays byte identical between runs and does not produce phantom diffs in git.
      *
      * @return array<int, array{theme: string, edition: string, css: string}>
      */
     private function readTailwindcss(string $entityType, int $entityId): array
     {
-        $jitCssRepository = $this->objectManager->get(self::JIT_CSS_REPOSITORY);
-
         $rows = [];
         foreach (self::EDITIONS as $edition) {
-            foreach ($jitCssRepository->getAllThemeStyles($entityType, $entityId, $edition) as $theme => $css) {
+            foreach ($this->jitCssRepository->getAllThemeStyles($entityType, $entityId, $edition) as $theme => $css) {
                 if ($css === '' || $css === null) {
                     continue;
                 }

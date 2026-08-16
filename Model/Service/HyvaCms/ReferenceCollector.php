@@ -20,20 +20,16 @@ namespace RocketWeb\CmsImportExport\Model\Service\HyvaCms;
 /**
  * Collects the cross entity identifiers a Hyva CMS content tree depends on.
  *
- * A missing dependency renders as nothing at all. Hyva\CmsLiveviewEditor\Block\Element::renderComponentNotFound()
- * returns an empty string outside preview, and an inactive row behaves the same way, so neither an exception nor a
- * log entry marks the spot. Recording the dependencies at export time is what lets the importer say so out loud.
+ * A missing dependency renders as nothing at all, with no exception and no log entry, so recording what an entity
+ * depends on at export time is what lets the importer say so out loud.
  *
- * The walk starts at the top level content and store_content keys and descends through every nested array below
- * them, because the two levels of a content tree carry different shapes: content is an object keyed by uid while
- * children is a plain list, and a field value sits flat on its node rather than under a fields wrapper. Hyva's own
- * Model\Export\ContentProcessor::processForExport() iterates content only and never descends into children, which
- * loses every reference below the first level. The version key is deliberately skipped, it holds editing metadata
- * rather than content.
+ * The walk starts at content and store_content and descends through every nested array, because the levels carry
+ * different shapes: content is an object keyed by uid, children is a plain list, and a field value sits flat on
+ * its node rather than under a fields wrapper. Hyva's own ContentProcessor::processForExport() iterates content
+ * only and loses every reference below the first level. The version key holds editing metadata and is skipped.
  *
- * The result is diagnostic, not authoritative. Nothing consumes it as the definitive dependency set: the importer
- * re-derives the references from the content it actually imported and compares the two, so a hand edited export
- * file cannot misreport what it depends on.
+ * The result is diagnostic. The importer re-derives references from the content it actually imported and compares,
+ * so a hand edited file cannot misreport its own dependencies.
  */
 class ReferenceCollector
 {
@@ -90,8 +86,7 @@ class ReferenceCollector
     }
 
     /**
-     * Malformed content yields nothing instead of throwing, because one unreadable draft must not abort an export
-     * of the whole catalogue of pages and blocks.
+     * Malformed content yields nothing instead of throwing, so one unreadable draft cannot abort a whole export.
      *
      * @param array<string, array<int, string>> $references
      */
@@ -116,9 +111,8 @@ class ReferenceCollector
     }
 
     /**
-     * Content is authored by merchants and nests without a declared limit, so the descent stops at MAX_DEPTH and
-     * whatever sits below that point goes uncollected. json_decode already refuses anything deeper than its own
-     * default of 512 levels, which makes this the tighter of the two guards.
+     * Merchant authored content nests without a declared limit, so the descent stops at MAX_DEPTH and anything
+     * below goes uncollected. It is the tighter of the two guards, json_decode refusing 512 levels being the other.
      *
      * @param array<array-key, mixed> $node
      * @param array<string, array<int, string>> $references

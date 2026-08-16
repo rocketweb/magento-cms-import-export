@@ -25,21 +25,14 @@ use Magento\Framework\ObjectManagerInterface;
  * Everything keys on the native cms_page_id / cms_block_id, so the native row has to be saved before any of this
  * runs. That id is also what the entity_ref_id column of the Tailwind tables holds, not the id of the Hyva row.
  *
- * Lazy resolution through the object manager is the same exception ContentReader documents: no Hyva class may
- * appear in a type hint, a constructor signature or the module sequence, because this module has to keep running
- * on a plain Magento install. Callers guard on isAvailable() and hand over plain arrays.
+ * The object manager is used for the reason ContentReader documents, and in the same shape.
  *
- * Content is written through Hyva\CmsLiveviewEditor\Model\Provider rather than the repositories, because the
- * provider creates the Hyva row when it is absent and dispatches clean_cache_by_tags on publish, neither of which
- * a plain repository save does.
+ * Content goes through Provider rather than the repositories, because it creates the Hyva row when absent and
+ * dispatches clean_cache_by_tags on publish, neither of which a repository save does.
  *
- * Content and CSS are both written published first and draft second, and both orders are load bearing:
- *  - Provider::saveContent() with publish = true writes published_content AND draft_content, so a draft saved
- *    first is overwritten by the publish that follows it.
- *  - JitCssRepository::saveStyles() deletes the draft rows along with the published ones when it is called for
- *    the published edition, so draft CSS saved first is deleted by the publish that follows it.
- * An edition with no rows is skipped rather than saved empty, because saving it would delete rows that the
- * payload never meant to replace.
+ * Published is written before draft in both cases, and both orders are load bearing. Provider::saveContent() with
+ * publish = true writes published_content AND draft_content. JitCssRepository::saveStyles() deletes the draft rows
+ * along with the published ones. Either reversed, the draft is lost.
  */
 class ContentWriter
 {
@@ -53,24 +46,42 @@ class ContentWriter
     private const EDITION_DRAFT = 'draft';
     private const EDITIONS_IN_WRITE_ORDER = [self::EDITION_PUBLISHED, self::EDITION_DRAFT];
 
-    public function __construct(
-        private readonly ObjectManagerInterface $objectManager
-    ) {
-    }
+    /**
+     * @var \Hyva\CmsLiveviewEditor\Model\Provider|null
+     */
+    private readonly ?object $provider;
 
     /**
-     * Whether Hyva CMS is installed and its content can be written at all.
-     *
-     * Every type this class resolves is checked, not just the first one. The repositories live in Hyva_CmsMagento
-     * while Provider and JitCssRepository live in Hyva_CmsLiveviewEditor, and a single check covers both only for
-     * as long as the two keep shipping inside one package.
+     * @var \Hyva\CmsMagento\Api\PageRepositoryInterface|null
      */
-    public function isAvailable(): bool
+    private readonly ?object $pageRepository;
+
+    /**
+     * @var \Hyva\CmsMagento\Api\BlockRepositoryInterface|null
+     */
+    private readonly ?object $blockRepository;
+
+    /**
+     * @var \Hyva\CmsLiveviewEditor\Model\Tailwind\JitCssRepository|null
+     */
+    private readonly ?object $jitCssRepository;
+
+    public function __construct(ObjectManagerInterface $objectManager)
     {
-        return interface_exists(self::PAGE_REPOSITORY)
+        $hyvaCmsInstalled = interface_exists(self::PAGE_REPOSITORY)
             && interface_exists(self::BLOCK_REPOSITORY)
             && class_exists(self::PROVIDER)
             && class_exists(self::JIT_CSS_REPOSITORY);
+
+        $this->provider = $hyvaCmsInstalled ? $objectManager->get(self::PROVIDER) : null;
+        $this->pageRepository = $hyvaCmsInstalled ? $objectManager->get(self::PAGE_REPOSITORY) : null;
+        $this->blockRepository = $hyvaCmsInstalled ? $objectManager->get(self::BLOCK_REPOSITORY) : null;
+        $this->jitCssRepository = $hyvaCmsInstalled ? $objectManager->get(self::JIT_CSS_REPOSITORY) : null;
+    }
+
+    public function isAvailable(): bool
+    {
+        return $this->provider !== null;
     }
 
     /**
@@ -112,23 +123,23 @@ class ContentWriter
      */
     private function writeContent(string $entityType, int $entityId, array $payload): void
     {
-        $provider = $this->objectManager->get(self::PROVIDER);
         $published = $payload['published_content'] ?? null;
         $draft = $payload['draft_content'] ?? null;
 
         if (is_string($published) && $published !== '') {
-            $provider->saveContent($entityType, $entityId, $published, true);
+            $this->provider->saveContent($entityType, $entityId, $published, true);
         }
 
         if (!is_string($draft) || $draft === '') {
             return;
         }
 
-        $provider->saveContent($entityType, $entityId, $draft, false);
+        $this->provider->saveContent($entityType, $entityId, $draft, false);
     }
 
     /**
-     * The flat exported rows are grouped back into the theme to css map saveStyles() expects, one map per edition.
+     * An edition with no rows is skipped rather than saved empty, which would delete rows the payload never meant
+     * to replace.
      *
      * @param array<int, array{theme: string, edition: string, css: string}> $rows
      */
@@ -148,20 +159,19 @@ class ContentWriter
             $themeMaps[$edition][(string)$row['theme']] = (string)$row['css'];
         }
 
-        $jitCssRepository = $this->objectManager->get(self::JIT_CSS_REPOSITORY);
         foreach (self::EDITIONS_IN_WRITE_ORDER as $edition) {
             if ($themeMaps[$edition] === []) {
                 continue;
             }
 
-            $jitCssRepository->saveStyles($entityType, $entityId, $themeMaps[$edition], $edition);
+            $this->jitCssRepository->saveStyles($entityType, $entityId, $themeMaps[$edition], $edition);
         }
     }
 
     /**
      * saveContent() forces is_liveview_enabled true on publish and never touches is_tailwindcss_jit_enabled, so
-     * both flags are restored from the payload afterwards. Only keys the payload actually carries are applied, so
-     * that a hand written file cannot silently switch a flag off by omitting it.
+     * both are restored afterwards. Only keys the payload carries are applied, so an omitted key cannot switch a
+     * flag off.
      *
      * @param array<string, mixed> $payload
      */
@@ -174,7 +184,7 @@ class ContentWriter
         }
 
         $isPage = $entityType === self::ENTITY_TYPE_PAGE;
-        $repository = $this->objectManager->get($isPage ? self::PAGE_REPOSITORY : self::BLOCK_REPOSITORY);
+        $repository = $isPage ? $this->pageRepository : $this->blockRepository;
         $entity = $isPage ? $repository->getByCmsPageId($entityId) : $repository->getByCmsBlockId($entityId);
         if ($entity === null) {
             return;

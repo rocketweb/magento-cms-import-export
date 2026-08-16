@@ -21,24 +21,17 @@ use Magento\Framework\App\ResourceConnection;
 use Magento\Theme\Model\ResourceModel\Theme\CollectionFactory as ThemeCollectionFactory;
 
 /**
- * Checks an imported Hyva CMS payload against the install it just landed in and reports what will not work.
+ * Checks an imported Hyva CMS payload against the install it landed in and reports what will not work.
  *
- * Nothing here fails an import. A page that is mostly right and names what a human still has to fix beats an all
- * or nothing import, and both failures this reports are otherwise completely silent on the storefront:
- * Hyva\CmsLiveviewEditor\Block\Element::renderComponentNotFound() returns an empty string outside preview with no
- * exception and no log entry, and CSS for a theme this install does not have is simply never selected.
+ * Nothing here fails an import, because both failures it reports are otherwise silent on the storefront:
+ * Element::renderComponentNotFound() returns an empty string outside preview, and CSS for an unregistered theme
+ * is never selected.
  *
- * References are re-derived from the imported content rather than read from the payload's own references key, so
- * a hand edited file cannot misreport what it depends on.
- *
- * A missing table is treated as "nothing of that kind exists" rather than as a reason to skip the check, because
- * Hyva_MenuBuilder and Hyva_CmsInstanceComponents ship separately from the CMS integration this module reads
- * through, and an absent module is precisely the case where the reference cannot resolve.
- *
- * A reference only counts as resolved when the target is active. All three kinds render as nothing when they are
- * disabled, so an inactive target fails exactly like a missing one and has to be reported the same way:
- * CmsBlockRenderer::renderBlock() returns early on is_active false, Menu\Widget::_beforeToHtml() only renders
- * inside if ($menu && $menu->isActive()), and an inactive instance component never reaches its template.
+ * References are re-derived from the imported content rather than read from the payload's references key, so a
+ * hand edited file cannot misreport what it depends on. A missing table counts as "nothing of that kind exists",
+ * since Hyva_MenuBuilder and Hyva_CmsInstanceComponents ship separately and an absent module is exactly the case
+ * where the reference cannot resolve. A target only counts as resolved when it is active: all three kinds render
+ * as nothing when disabled.
  */
 class PayloadValidator
 {
@@ -126,9 +119,6 @@ class PayloadValidator
     }
 
     /**
-     * All three tables carry an is_active column, and a disabled row renders as nothing just like a missing one,
-     * so the filter applies to every kind rather than to instance components alone.
-     *
      * @param array<int, string> $identifiers
      * @return array<int, string> the subset of $identifiers that resolves and is active in this install
      */
