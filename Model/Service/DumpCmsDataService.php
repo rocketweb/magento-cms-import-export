@@ -23,6 +23,7 @@ use Magento\Framework\Filesystem\Directory\WriteInterface;
 class DumpCmsDataService
 {
     public const STORE_SCOPE_ALL = '_all_';
+    private const CSS_SIZE_WARNING_THRESHOLD = 60000;
     private \Magento\Cms\Api\PageRepositoryInterface $pageRepository;
     private \Magento\Cms\Api\BlockRepositoryInterface $blockRepository;
     private \Magento\Framework\Api\SearchCriteriaBuilder $criteriaBuilder;
@@ -31,6 +32,7 @@ class DumpCmsDataService
     private \Magento\Framework\Serialize\SerializerInterface $serializer;
     private \Magento\Catalog\Model\CategoryList $categoryList;
     private \Magento\Store\Model\StoreManagerInterface $storeManager;
+    private \RocketWeb\CmsImportExport\Model\Service\HyvaCms\ContentReader $hyvaContentReader;
     private array $blockIdentifiers = [];
     private array $blocksMapping = [];
 
@@ -42,7 +44,8 @@ class DumpCmsDataService
         \Magento\Framework\Filesystem\DirectoryList $directoryList,
         \Magento\Framework\Filesystem $filesystem,
         \Magento\Framework\Serialize\SerializerInterface $serializer,
-        \Magento\Store\Model\StoreManagerInterface $storeManager
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \RocketWeb\CmsImportExport\Model\Service\HyvaCms\ContentReader $hyvaContentReader
     ) {
         $this->pageRepository = $pageRepository;
         $this->blockRepository = $blockRepository;
@@ -52,9 +55,10 @@ class DumpCmsDataService
         $this->serializer = $serializer;
         $this->categoryList = $categoryList;
         $this->storeManager = $storeManager;
+        $this->hyvaContentReader = $hyvaContentReader;
     }
 
-    public function execute(array $types, ?array $identifiers, bool $removeAll)
+    public function execute(array $types, ?array $identifiers, bool $removeAll, bool $hyvaCms = false)
     {
         $varDirectory = $this->filesystem->getDirectoryWrite(DirectoryList::VAR_DIR);
         $varPath = $this->directoryList->getPath(DirectoryList::VAR_DIR);
@@ -63,11 +67,16 @@ class DumpCmsDataService
             $varDirectory->delete($workingDirPath);
         }
 
+        if ($hyvaCms && !$this->hyvaContentReader->isAvailable()) {
+            echo "Warning: --hyva-cms was requested but Hyva CMS is not installed, "
+                . "no .hyva.json files will be written and the native export continues\n";
+        }
+
         foreach ($types as $type) {
             if ($type == 'block') {
-                $this->dumpBlocks($workingDirPath . '/cms/blocks/', $varDirectory, $identifiers);
+                $this->dumpBlocks($workingDirPath . '/cms/blocks/', $varDirectory, $identifiers, $hyvaCms);
             } else if ($type == 'page') {
-                $this->dumpPages($workingDirPath . '/cms/pages/', $varDirectory, $identifiers);
+                $this->dumpPages($workingDirPath . '/cms/pages/', $varDirectory, $identifiers, $hyvaCms);
             }
         }
     }
@@ -125,8 +134,35 @@ class DumpCmsDataService
         return $storeCodes;
     }
 
-    private function dumpPages(string $path, WriteInterface $varDirectory, ?array $identifiers): void
+    /**
+     * Warns about CSS rows that are approaching the 64KB limit of the text column they are imported back into.
+     *
+     * @param string $identifier
+     * @param array<int, array{theme: string, edition: string, css: string}> $tailwindcss
+     */
+    private function warnOnLargeCss(string $identifier, array $tailwindcss): void
     {
+        foreach ($tailwindcss as $row) {
+            $size = strlen($row['css']);
+            if ($size < self::CSS_SIZE_WARNING_THRESHOLD) {
+                continue;
+            }
+
+            echo sprintf(
+                "%s CSS for theme %s is %d bytes, approaching the 64KB column limit\n",
+                $identifier,
+                $row['theme'],
+                $size
+            );
+        }
+    }
+
+    private function dumpPages(
+        string $path,
+        WriteInterface $varDirectory,
+        ?array $identifiers,
+        bool $hyvaCms
+    ): void {
         $searchCriteria = $this->criteriaBuilder;
         if ($identifiers) {
             $searchCriteria->addFilter('identifier', $identifiers, 'in');
@@ -159,11 +195,23 @@ class DumpCmsDataService
                 $jsonContent['is_tailwindcss_jit_enabled'] = $page->getIsTailwindcssJitEnabled();
             }
             $this->write($varDirectory, $jsonPath, $this->serializer->serialize($jsonContent));
+            if ($hyvaCms && $this->hyvaContentReader->isAvailable()) {
+                $hyvaData = $this->hyvaContentReader->readPage((int)$page->getId());
+                if ($hyvaData !== null) {
+                    $this->warnOnLargeCss($identifier, $hyvaData['tailwindcss']);
+                    $hyvaPath = $path . $identifier . '---' . implode('---', $storeCodes) . '.hyva.json';
+                    $this->write($varDirectory, $hyvaPath, $this->serializer->serialize($hyvaData));
+                }
+            }
         }
     }
 
-    private function dumpBlocks(string $path, WriteInterface $varDirectory, ?array $identifiers): void
-    {
+    private function dumpBlocks(
+        string $path,
+        WriteInterface $varDirectory,
+        ?array $identifiers,
+        bool $hyvaCms
+    ): void {
         $searchCriteria = $this->criteriaBuilder;
         if ($identifiers) {
             $searchCriteria->addFilter('identifier', $identifiers, 'in');
@@ -194,6 +242,15 @@ class DumpCmsDataService
                 $jsonContent['is_tailwindcss_jit_enabled'] = $block->getIsTailwindcssJitEnabled();
             }
             $this->write($varDirectory, $jsonPath, $this->serializer->serialize($jsonContent));
+            if ($hyvaCms && $this->hyvaContentReader->isAvailable()) {
+                $hyvaData = $this->hyvaContentReader->readBlock((int)$block->getId());
+                if ($hyvaData !== null) {
+                    $this->warnOnLargeCss(trim($block->getIdentifier()), $hyvaData['tailwindcss']);
+                    $hyvaPath = $path . trim($block->getIdentifier())
+                        . '---' . implode('---', $storeCodes) . '.hyva.json';
+                    $this->write($varDirectory, $hyvaPath, $this->serializer->serialize($hyvaData));
+                }
+            }
         }
     }
 }

@@ -29,11 +29,12 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
     private const INPUT_KEY_IDENTIFIER = 'identifier';
     private const INPUT_KEY_IMPORT_ALL = 'importAll';
     private const INPUT_KEY_STORE = 'store';
+    private const INPUT_KEY_HYVA_CMS = 'hyva-cms';
     private \RocketWeb\CmsImportExport\Model\Service\ImportCmsDataService $importCmsDataService;
 
     public function __construct(
         \RocketWeb\CmsImportExport\Model\Service\ImportCmsDataService $importCmsDataService,
-        string $name = null
+        ?string $name = null
     ) {
         parent::__construct($name);
         $this->importCmsDataService = $importCmsDataService;
@@ -67,6 +68,12 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
                 's',
                 InputOption::VALUE_OPTIONAL,
                 'Specific Store Code'
+            ),
+            new InputOption(
+                self::INPUT_KEY_HYVA_CMS,
+                null,
+                InputOption::VALUE_NONE,
+                'Also import Hyva CMS content and its per-entity Tailwind CSS'
             )
         ]);
         parent::configure();
@@ -76,6 +83,7 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
     {
         $type = $input->getOption(self::INPUT_KEY_TYPE);
         $importAll = (bool)$input->getOption(self::INPUT_KEY_IMPORT_ALL);
+        $hyvaCms = (bool)$input->getOption(self::INPUT_KEY_HYVA_CMS);
         if ($type === null) {
             throw new \RuntimeException("Type ([-t|--type) is required");
         }
@@ -99,7 +107,7 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
             null :
             $input->getOption(self::INPUT_KEY_STORE);
 
-        $this->importCmsDataService->execute($types, $identifiers, $importAll, $storeCode);
+        $this->importCmsDataService->execute($types, $identifiers, $importAll, $storeCode, $hyvaCms);
 
         return 0;
     }
