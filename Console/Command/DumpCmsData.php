@@ -26,6 +26,7 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
     private const INPUT_TYPE_VALUES = ['block', 'page', 'all'];
     private const INPUT_KEY_IDENTIFIER = 'identifier';
     private const INPUT_KEY_REMOVE_ALL = 'removeAll';
+    private const INPUT_KEY_HYVA_CMS = 'hyva-cms';
     private \RocketWeb\CmsImportExport\Model\Service\DumpCmsDataService $dumpCmsDataService;
 
     public function __construct(
@@ -58,6 +59,12 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
                 'r',
                 InputOption::VALUE_NONE,
                 'Flag to remove all existing data'
+            ),
+            new InputOption(
+                self::INPUT_KEY_HYVA_CMS,
+                null,
+                InputOption::VALUE_NONE,
+                'Also dump Hyva CMS content and its per-entity Tailwind CSS'
             )
         ]);
         parent::configure();
@@ -67,6 +74,7 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
     {
         $type = $input->getOption(self::INPUT_KEY_TYPE);
         $removeAll = (bool)$input->getOption(self::INPUT_KEY_REMOVE_ALL);
+        $hyvaCms = (bool)$input->getOption(self::INPUT_KEY_HYVA_CMS);
         if ($type === null) {
             throw new \RuntimeException("Type ([-t|--type) is required");
         }
@@ -86,7 +94,7 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
             $identifiers = explode(',', $identifiers);
         }
 
-        $this->dumpCmsDataService->execute($types, $identifiers, $removeAll);
+        $this->dumpCmsDataService->execute($types, $identifiers, $removeAll, $hyvaCms);
 
         return 0;
     }

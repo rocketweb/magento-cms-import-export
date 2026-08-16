@@ -55,8 +55,13 @@ class ImportCmsDataService
         $this->storeRepository = $storeRepository;
     }
 
-    public function execute(array $types, ?array $identifiers, bool $importAll, ?string $storeCode = null)
-    {
+    public function execute(
+        array $types,
+        ?array $identifiers,
+        bool $importAll,
+        ?string $storeCode = null,
+        bool $hyvaCms = false
+    ) {
         $workingDirPath = 'sync_cms_data';
 
         if (!$this->directoryRead->isExist($this->varPath . $workingDirPath)) {

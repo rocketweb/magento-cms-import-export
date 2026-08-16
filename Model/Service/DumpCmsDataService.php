@@ -54,7 +54,7 @@ class DumpCmsDataService
         $this->storeManager = $storeManager;
     }
 
-    public function execute(array $types, ?array $identifiers, bool $removeAll)
+    public function execute(array $types, ?array $identifiers, bool $removeAll, bool $hyvaCms = false)
     {
         $varDirectory = $this->filesystem->getDirectoryWrite(DirectoryList::VAR_DIR);
         $varPath = $this->directoryList->getPath(DirectoryList::VAR_DIR);
