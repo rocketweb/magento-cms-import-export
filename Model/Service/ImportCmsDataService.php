@@ -24,6 +24,11 @@ use Magento\Framework\App\Filesystem\DirectoryList;
 class ImportCmsDataService
 {
     private const STORE_SCOPE_ADMIN = 'admin';
+    private const HYVA_SUFFIX = '.hyva.json';
+    private const HYVA_WARNING_PREFIX = 'Hyva CMS warning:';
+    private const ENTITY_TYPE_PAGE = 'page';
+    private const ENTITY_TYPE_BLOCK = 'block';
+    private int $hyvaWarningCount = 0;
     private \Magento\Cms\Api\PageRepositoryInterface $pageRepository;
     private \Magento\Cms\Api\BlockRepositoryInterface $blockRepository;
     private \Magento\Framework\Serialize\SerializerInterface $serializer;
@@ -43,7 +48,9 @@ class ImportCmsDataService
         \Magento\Framework\Serialize\SerializerInterface $serializer,
         \Magento\Store\Api\StoreRepositoryInterface $storeRepository,
         private readonly \Magento\Cms\Api\GetBlockByIdentifierInterface $getBlockByIdentifier,
-        private readonly \Magento\Cms\Api\GetPageByIdentifierInterface $getPageByIdentifier
+        private readonly \Magento\Cms\Api\GetPageByIdentifierInterface $getPageByIdentifier,
+        private readonly \RocketWeb\CmsImportExport\Model\Service\HyvaCms\ContentWriter $hyvaContentWriter,
+        private readonly \RocketWeb\CmsImportExport\Model\Service\HyvaCms\PayloadValidator $hyvaPayloadValidator
     ) {
         $this->pageRepository = $pageRepository;
         $this->blockRepository = $blockRepository;
@@ -72,6 +79,11 @@ class ImportCmsDataService
             throw new \Exception('If you want to import all entries at once, use --importAll flag');
         }
 
+        if ($hyvaCms && !$this->hyvaContentWriter->isAvailable()) {
+            echo "Warning: --hyva-cms was requested but Hyva CMS is not installed, "
+                . "no .hyva.json files will be imported and the native import continues\n";
+        }
+
         foreach ($types as $type) {
             $typeDirPath = $workingDirPath . sprintf('/cms/%ss/', $type);
             if (!$this->directoryRead->isExist($this->varPath . $typeDirPath)) {
@@ -79,10 +91,17 @@ class ImportCmsDataService
             }
 
             if ($type == 'block') {
-                $this->importBlocks($typeDirPath, $identifiers, $storeCode);
+                $this->importBlocks($typeDirPath, $identifiers, $storeCode, $hyvaCms);
             } else if ($type == 'page') {
-                $this->importPages($typeDirPath, $identifiers, $storeCode);
+                $this->importPages($typeDirPath, $identifiers, $storeCode, $hyvaCms);
             }
+        }
+
+        if ($this->hyvaWarningCount > 0) {
+            echo sprintf(
+                "Hyva CMS: %d warning(s) reported above, the import completed anyway\n",
+                $this->hyvaWarningCount
+            );
         }
     }
 
@@ -106,8 +125,12 @@ class ImportCmsDataService
         return $storeIds;
     }
 
-    private function importBlocks(string $dirPath, ?array $identifiers, ?string $storeCode = null): void
-    {
+    private function importBlocks(
+        string $dirPath,
+        ?array $identifiers,
+        ?string $storeCode = null,
+        bool $hyvaCms = false
+    ): void {
         $filePaths = $this->directoryRead->read($this->varPath . $dirPath);
         foreach ($filePaths as $filePath) {
             if (strpos($filePath, '.html') === false) {
@@ -159,15 +182,24 @@ class ImportCmsDataService
             }
 
             try {
-                $this->blockRepository->save($block);
+                $block = $this->blockRepository->save($block);
             } catch (\Exception $exception) {
                 echo $exception->getMessage() . ', Block ID: ' . $identifier . "\n";
+                continue;
+            }
+
+            if ($hyvaCms) {
+                $this->importHyvaCms($filePath, self::ENTITY_TYPE_BLOCK, $identifier, (int)$block->getId());
             }
         }
     }
 
-    private function importPages(string $dirPath, ?array $identifiers, ?string $storeCode = null): void
-    {
+    private function importPages(
+        string $dirPath,
+        ?array $identifiers,
+        ?string $storeCode = null,
+        bool $hyvaCms = false
+    ): void {
         $filePaths = $this->directoryRead->read($this->varPath . $dirPath);
         foreach ($filePaths as $filePath) {
             if (strpos($filePath, '.html') === false) {
@@ -224,11 +256,76 @@ class ImportCmsDataService
             }
 
             try {
-                $this->pageRepository->save($page);
+                $page = $this->pageRepository->save($page);
             } catch (\Exception $exception) {
                 echo $exception->getMessage() . ' | Page ID: ' . $identifier . "\n";
+                continue;
+            }
+
+            if ($hyvaCms) {
+                $this->importHyvaCms($filePath, self::ENTITY_TYPE_PAGE, $identifier, (int)$page->getId());
             }
         }
+    }
+
+    /**
+     * Applies the .hyva.json sibling of an already saved native page or block, then reports what will not resolve.
+     *
+     * The write is attempted before the validation so that the warnings describe the state the database is
+     * actually left in, and a failed write is reported rather than thrown, because a partial import a human can
+     * finish beats an all or nothing one.
+     */
+    private function importHyvaCms(string $filePath, string $entityType, string $identifier, int $entityId): void
+    {
+        if (!$this->hyvaContentWriter->isAvailable()) {
+            return;
+        }
+
+        $hyvaPath = str_replace('.html', self::HYVA_SUFFIX, $filePath);
+        if (!$this->directoryRead->isExist($hyvaPath)) {
+            return;
+        }
+
+        $entityLabel = sprintf('%s "%s"', $entityType, $identifier);
+        try {
+            $payload = $this->serializer->unserialize($this->directoryRead->readFile($hyvaPath));
+        } catch (\Exception $exception) {
+            $this->warnHyva(
+                sprintf('%s has an unreadable %s: %s', $entityLabel, self::HYVA_SUFFIX, $exception->getMessage())
+            );
+            return;
+        }
+
+        if (!is_array($payload)) {
+            $this->warnHyva(
+                sprintf('%s has a %s that is not an object, skipping it', $entityLabel, self::HYVA_SUFFIX)
+            );
+            return;
+        }
+
+        try {
+            if ($entityType === self::ENTITY_TYPE_PAGE) {
+                $this->hyvaContentWriter->writePage($entityId, $payload);
+            } else {
+                $this->hyvaContentWriter->writeBlock($entityId, $payload);
+            }
+        } catch (\Exception $exception) {
+            $this->warnHyva(sprintf('%s could not be written: %s', $entityLabel, $exception->getMessage()));
+        }
+
+        foreach ($this->hyvaPayloadValidator->validate($entityLabel, $payload) as $warning) {
+            $this->warnHyva($warning);
+        }
+    }
+
+    /**
+     * Reports one Hyva CMS problem and keeps it in the run total, so that a warning cannot scroll past unnoticed
+     * in the middle of a long import.
+     */
+    private function warnHyva(string $message): void
+    {
+        echo self::HYVA_WARNING_PREFIX . ' ' . $message . PHP_EOL;
+        $this->hyvaWarningCount++;
     }
 
     /**
