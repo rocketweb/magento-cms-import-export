@@ -213,3 +213,35 @@ php bin/magento cms:import:data --type=all --importAll --hyva-cms
 
 The Hyva CSS tables carry a foreign key to `cms_page` and `cms_block`, not to the Hyva content rows. Deleting a Hyva
 content row therefore does not cascade its CSS. The two have to be handled explicitly.
+
+### What `--hyva-cms` deliberately leaves out
+
+These were considered and left out on purpose. They are not oversights.
+
+**Menus.** `hyva_commerce_cms_menu` is a separate content root with no `cms_page` anchor, and it ships in a different
+composer package. Its CSS has to travel as soon as a page embeds a `hyva_menu_widget`. The collector already records
+the reference and the importer already warns on it, so the gap is visible rather than silent.
+
+**Templates and snippets.** Both are copy on insert.
+`liveview-editor/Magewire/Traits/Component.php:657` `pasteComponents()` calls `regenerateUids()` and splices the
+subtree straight into the content. Loading a template and pasting from the clipboard are the same code path, and
+nothing records where the components came from. So a page never references a template or a snippet at render time,
+and the page's own CSS row already covers their components, because the compiler is fed the whole component tree.
+Their CSS tables feed the editor preview only.
+
+**Instance components.** A genuine live reference, and worth a later phase. Their classes compile into the host
+page's CSS row, so an imported page keeps its styling even when the definition is missing: it renders blank exactly
+where the component was. The same coupling cuts the other way, editing a definition leaves every host page's CSS
+stale until that page is saved again.
+
+**Product and category attribute content.** Separate content roots. Their `store_content` is keyed by store id inside
+the JSON rather than by a store table, so they need their own export shape.
+
+**Version history.** `hyva_commerce_cms_page_version_history` and its block counterpart hold per-environment editing
+history, not content. Carrying them would overwrite the target's own history.
+
+**A Transfer Center handler.** `ContentTypeHandlerInterface` is `@api` and genuinely open, and
+`Hyva\MenuBuilder\Model\ImportExport\MenuHandler` proves a third-party package can register one. But the Transfer
+Center has no server-side ZIP and no CLI: assembly and extraction happen in the browser with a bundled `fflate.js`,
+and the server side is a handful of adminhtml AJAX endpoints behind an admin session. A handler therefore buys a CLI
+tool nothing. Worth adding later if these types should also appear in the admin UI.
