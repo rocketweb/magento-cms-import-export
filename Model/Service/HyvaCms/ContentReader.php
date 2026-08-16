@@ -42,7 +42,8 @@ class ContentReader
     private const EDITIONS = ['published', 'draft'];
 
     public function __construct(
-        private readonly ObjectManagerInterface $objectManager
+        private readonly ObjectManagerInterface $objectManager,
+        private readonly ReferenceCollector $referenceCollector
     ) {
     }
 
@@ -60,6 +61,7 @@ class ContentReader
      *     is_tailwindcss_jit_enabled: bool,
      *     draft_content: string|null,
      *     published_content: string|null,
+     *     references: array<string, array<int, string>>,
      *     tailwindcss: array<int, array{theme: string, edition: string, css: string}>
      * }|null null when Hyva CMS is absent or the page is not Hyva managed
      */
@@ -83,6 +85,7 @@ class ContentReader
      *     is_tailwindcss_jit_enabled: bool,
      *     draft_content: string|null,
      *     published_content: string|null,
+     *     references: array<string, array<int, string>>,
      *     tailwindcss: array<int, array{theme: string, edition: string, css: string}>
      * }|null null when Hyva CMS is absent or the block is not Hyva managed
      */
@@ -104,15 +107,22 @@ class ContentReader
      * Both flags are cast because isLiveviewEnabled() is declared nullable while isTailwindcssJitEnabled() is
      * not, and the exported payload has to carry the same JSON type for both on every run.
      *
+     * References are collected from the draft and the published copy together, since a draft may already depend
+     * on an entity the published copy does not, and both editions travel in the same exported file.
+     *
      * @param object $entity Hyva\CmsMagento\Api\Data\PageInterface or BlockInterface
      */
     private function buildContent(object $entity, string $entityType, int $entityId): array
     {
+        $draftContent = $entity->getDraftContent();
+        $publishedContent = $entity->getPublishedContent();
+
         return [
             'is_liveview_enabled' => (bool)$entity->isLiveviewEnabled(),
             'is_tailwindcss_jit_enabled' => (bool)$entity->isTailwindcssJitEnabled(),
-            'draft_content' => $entity->getDraftContent(),
-            'published_content' => $entity->getPublishedContent(),
+            'draft_content' => $draftContent,
+            'published_content' => $publishedContent,
+            'references' => $this->referenceCollector->collectFromAll([$draftContent, $publishedContent]),
             'tailwindcss' => $this->readTailwindcss($entityType, $entityId)
         ];
     }
