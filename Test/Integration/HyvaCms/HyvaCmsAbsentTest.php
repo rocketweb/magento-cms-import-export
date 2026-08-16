@@ -25,12 +25,12 @@ use RocketWeb\CmsImportExport\Model\Service\HyvaCms\PayloadValidator;
  */
 class HyvaCmsAbsentTest extends TestCase
 {
-    private ?ContentReader $reader;
-    private ?ContentWriter $writer;
-    private ?PayloadValidator $validator;
-    private ?DumpCmsDataService $exporter;
-    private ?WriteInterface $varDirectory;
-    private ?string $exportDirPath;
+    private ?ContentReader $reader = null;
+    private ?ContentWriter $writer = null;
+    private ?PayloadValidator $validator = null;
+    private ?DumpCmsDataService $exporter = null;
+    private ?WriteInterface $varDirectory = null;
+    private ?string $exportDirPath = null;
 
     protected function setUp(): void
     {
@@ -50,6 +50,10 @@ class HyvaCmsAbsentTest extends TestCase
      */
     protected function tearDown(): void
     {
+        if ($this->varDirectory === null) {
+            return;
+        }
+
         if ($this->varDirectory->isExist($this->exportDirPath)) {
             $this->varDirectory->delete($this->exportDirPath);
         }

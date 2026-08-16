@@ -26,9 +26,9 @@ class HyvaCmsPresentTest extends TestCase
     private const PROVIDER = \Hyva\CmsLiveviewEditor\Model\Provider::class;
     private const ENTITY_TYPE_PAGE = 'cms_page';
 
-    private ?ContentReader $reader;
-    private ?ContentWriter $writer;
-    private ?PageRepositoryInterface $pageRepository;
+    private ?ContentReader $reader = null;
+    private ?ContentWriter $writer = null;
+    private ?PageRepositoryInterface $pageRepository = null;
 
     protected function setUp(): void
     {

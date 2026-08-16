@@ -15,7 +15,7 @@ use RocketWeb\CmsImportExport\Model\Service\HyvaCms\ReferenceCollector;
  */
 class ReferenceCollectorTest extends TestCase
 {
-    private ?ReferenceCollector $collector;
+    private ?ReferenceCollector $collector = null;
 
     protected function setUp(): void
     {
