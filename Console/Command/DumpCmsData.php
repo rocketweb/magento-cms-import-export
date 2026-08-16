@@ -30,7 +30,7 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
 
     public function __construct(
         \RocketWeb\CmsImportExport\Model\Service\DumpCmsDataService $dumpCmsDataService,
-        string $name = null
+        ?string $name = null
     ) {
         parent::__construct($name);
         $this->dumpCmsDataService = $dumpCmsDataService;

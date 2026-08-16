@@ -33,7 +33,7 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
 
     public function __construct(
         \RocketWeb\CmsImportExport\Model\Service\ImportCmsDataService $importCmsDataService,
-        string $name = null
+        ?string $name = null
     ) {
         parent::__construct($name);
         $this->importCmsDataService = $importCmsDataService;
