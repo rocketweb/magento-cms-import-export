@@ -73,7 +73,7 @@ Every file name carries the store codes the entity is assigned to, joined with `
 renders as `_all_`, so `about-us` on All Store Views becomes `about-us---_all_.html`. A `/` inside an identifier
 becomes `---` and a `.html` suffix becomes `_html`.
 
-With `--hyva-cms` a third file joins each pair. See [Hyva CMS content](#hyva-cms-content) below.
+With `--hyva-cms` a third file joins each pair, see [Hyva CMS content](#hyva-cms-content).
 
 You can modify the HTML directly in your editor which should give you more flexibility.
 
@@ -113,171 +113,34 @@ By executing `php bin/magento cache:flush` you should be able to see the updated
 
 ## Hyva CMS content
 
-Native CMS content is the HTML in `cms_page.content` and `cms_block.content`. Hyva CMS keeps a component tree of its
-own alongside that row, plus a per-entity Tailwind CSS delta the storefront needs in order to render it. The optional
-`--hyva-cms` flag makes both travel through the repository with the files above.
+Hyva CMS stores its own component tree beside the native row, plus a per-entity Tailwind CSS delta the
+storefront needs to render it. Neither travels with the `.html` and `.json` above, and Hyva's own Transfer
+Center carries no CSS at all, so a promoted page renders unstyled until someone republishes it by hand.
 
-Hyva's own Transfer Center carries no CSS at all. Its ZIP holds `manifest.json`, a per-entity `settings.json` and
-`content.json`, an optional `translations.csv`, `images/**` and `media.json`, and nothing else. An entity imported
-through it has no CSS until a human opens it in the Liveview Editor and publishes. There is no bulk recompile to fall
-back on either, `Hyva_CmsTailwindRecompile` is not installed. Carrying the CSS ourselves is what lets a page promoted
-through git render on arrival.
-
-The flag exists on both commands. It has no shortcut letter, deliberately, because `-h` is help.
+`--hyva-cms` on either command adds a third file per entity, `%%IDENTIFIER%%---%%STORES%%.hyva.json`,
+holding `draft_content`, `published_content`, every `{theme, edition, css}` row, the two liveview flags,
+and a diagnostic `references` list.
 
 ```
-php bin/magento cms:dump:data --type=all -i rw-ie-fixture-page,rw-ie-fixture-block --hyva-cms
-php bin/magento cms:import:data --type=all -i rw-ie-fixture-page,rw-ie-fixture-block --hyva-cms
+php bin/magento cms:dump:data   --type=all -i contact-us,home-hero --hyva-cms
+php bin/magento cms:import:data --type=all -i contact-us,home-hero --hyva-cms
 ```
 
-> `--hyva-cms` defaults to off, and off is byte identical to the previous behaviour. Without the flag neither command
-reads or writes anything belonging to Hyva CMS. On an install where Hyva CMS is absent the flag is a no-op: both
-commands print a warning and carry on with the native export or import.
+The flag defaults to off. Off is byte identical to previous behaviour, and on an install without Hyva CMS
+both commands warn and carry on with the native export or import.
 
-### The sibling file
+Watch out for:
 
-Hyva CMS data lands in a third file, beside the `.html` and `.json` the commands already write:
+- **The `.html` is written empty for a Hyva entity**, because the component tree is what renders. Import
+  mirrors the source, so promoting a Hyva page clears the native content on the target.
+- **`cms:dump:data -r` without `--hyva-cms` deletes your `.hyva.json` files.**
+- **An unrestricted import overwrites live content for every entity with a sidecar.** Restrict with `-i`.
+- **Avoid `.html` inside a block identifier.** The block export writes it verbatim, unlike the page export.
+- Stored CSS is a delta against that theme's compiled `styles.css`, so source and target must run the same
+  theme build. The importer warns when the theme is missing on the target.
+- A missing block, menu or instance component renders as nothing, silently. The importer warns per miss.
+- Treat these files as code. Content and CSS reach the storefront unescaped, as the `.html` always has.
 
-```
-var/sync_cms_data/cms/pages/
-- rw-ie-fixture-page---_all_.html       => the native page HTML
-- rw-ie-fixture-page---_all_.json       => title, is_active, page_layout, stores
-- rw-ie-fixture-page---_all_.hyva.json  => Hyva CMS content and its Tailwind CSS
-```
-
-The name is `<identifier>---<storecodes>.hyva.json`, using the same identifier and store code suffix as the other two
-files. Store 0, meaning All Store Views, renders as `_all_`.
-
-A sibling file rather than extra keys inside the existing `.json`, for two reasons. An older build of this extension
-ignores a file it knows nothing about, where extra keys in a file it does know would be read, not round-tripped, and
-silently dropped on the next export. And it keeps the diff of the page HTML apart from the diff of the component tree,
-which is what this module is for.
-
-The payload carries:
-
-| Key | Contents |
-| --- | --- |
-| `is_liveview_enabled` | whether the entity renders through the Liveview Editor |
-| `is_tailwindcss_jit_enabled` | whether per-entity Tailwind CSS is compiled for it |
-| `draft_content` | the component tree as last saved |
-| `published_content` | the component tree the storefront renders |
-| `tailwindcss` | a list of `{theme, edition, css}` rows |
-| `references` | the cross-entity identifiers the content depends on |
-
-`references` is diagnostic only. Nothing reads it back on import: the importer re-derives the references from the
-content it actually imported and checks those, so a hand edited file cannot lie about its own dependencies.
-
-### The native content is not exported for a Hyva entity
-
-When `--hyva-cms` is on and an entity is Hyva managed, its `.html` is written empty. The component tree in the
-`.hyva.json` is what the storefront renders, so `cms_page.content` and `cms_block.content` are either empty
-already or left over from whatever built the page before Hyva CMS did. Carrying that is pure weight: six real
-pages in one project held 224 KB of stale HTML against 96 KB of live Hyva content.
-
-The file itself still has to exist, because the importer discovers entities by their `.html`. An entity that is
-not Hyva managed keeps its content as before, flag or no flag, and so does every entity when Hyva CMS is absent.
-
-Import mirrors the source, so promoting a Hyva page clears the native content on the target. That is the intended
-result. If a target holds legacy HTML you want to keep, do not promote that entity.
-
-### Which Tailwind CSS travels
-
-Hyva CMS writes several `*_tailwindcss` tables. Only the ones a storefront request reads are exported.
-
-| Table | Travels | Why |
-| --- | --- | --- |
-| `hyva_commerce_cms_page_tailwindcss` | yes | read on the storefront at `magento-cms/Plugin/Model/Page.php:176` |
-| `hyva_commerce_cms_block_tailwindcss` | yes | read at `magento-cms/Plugin/Model/Block.php:168`, for the block itself and for any block a page embeds |
-| `hyva_commerce_cms_menu_tailwindcss` | not yet | needed as soon as a page embeds a menu, read at `menu-builder/src/Block/Widget/Menu.php:99`. See the scope section below |
-| `hyva_cms_snippet_tailwindcss` | no | no storefront reader, it feeds the editor preview iframe |
-| `hyva_cms_template_tailwindcss` | no | preview iframe, plus one config driven attribute fallback that page content cannot reach |
-| `hyva_commerce_product_attribute_tailwindcss` | no | belongs to an attribute content export |
-| `hyva_commerce_category_attribute_tailwindcss` | no | same |
-
-Every `(theme, edition)` row travels, not only the one for the theme the entity's stores happen to use. The compiler
-writes a row per Hyva capable theme regardless of store assignment: the fixture page is on All Store Views and still
-carries rows for both `frontend/Cenveo/cms` and `frontend/Cenveo/marketplace`.
-
-### The target theme has to match
-
-Stored CSS is a delta against that theme's compiled `styles.css`, not a standalone stylesheet. It is only correct
-while the target theme build matches the source. That makes the flag safe for promoting one codebase between
-environments, which is what it is for, and unsafe for moving content between unrelated projects. The importer warns
-about it on every run.
-
-### Reference warnings
-
-A component that names something the target install does not have renders as a silent blank.
-`liveview-editor/Block/Element.php` `renderComponentNotFound()` returns an empty string outside the editor preview,
-with no exception and nothing in the log. An `is_active = 0` instance component fails in exactly the same way.
-
-The importer checks `cms_block`, `menu` and `instance_component` references, warns once per miss, and prints a run
-total at the end so a warning cannot scroll past unnoticed in a long import. It never fails the import. A partial
-import a human can fix beats an all or nothing one.
-
-### Things to watch out for
-
-**Treat these files as code, not as data.** The content and the CSS in a `.hyva.json` reach the storefront without
-escaping, the same way the `.html` sibling always has, so anything in them runs in a visitor's browser. Review a
-sidecar in a pull request the way you would review a template. This is the trust level the tool has always
-operated at, it is only worth stating because CSS looks inert and is not.
-
-**`cms:dump:data -r` without `--hyva-cms` deletes your `.hyva.json` files.** `-r` clears the whole sync directory, and
-a dump without the flag never writes them back. Without `-r` they survive byte identical. The database is untouched
-either way. Anyone who dumps without the flag after having dumped with it loses the sidecars from the working tree.
-
-**An unrestricted `--hyva-cms` import overwrites live Hyva CMS content for every entity that has a sidecar.** Restrict
-it with `-i` unless you genuinely mean to promote everything:
-
-```
-php bin/magento cms:import:data --type=all -i rw-ie-fixture-page,rw-ie-fixture-block --hyva-cms
-```
-
-That applies two sidecars. This applies every one in the sync directory:
-
-```
-php bin/magento cms:import:data --type=all --importAll --hyva-cms
-```
-
-**A block identifier containing `.html` breaks its `.json` sibling.** The page export converts `.html` inside an
-identifier to `_html` before building the filename, but the block export writes the identifier verbatim. So a block
-called `promo.html-banner` exports to `promo.html-banner---_all_.html` and the importer, which swaps the extension,
-has to swap only the trailing one. `--hyva-cms` handles this correctly. The older `.json` path does not, and a block
-named that way loses its title and store assignment on import. Avoid `.html` in a block identifier.
-
-### Deleting Hyva CMS content
-
-The Hyva CSS tables carry a foreign key to `cms_page` and `cms_block`, not to the Hyva content rows. Deleting a Hyva
-content row therefore does not cascade its CSS. The two have to be handled explicitly.
-
-### What `--hyva-cms` deliberately leaves out
-
-These were considered and left out on purpose. They are not oversights.
-
-**Menus.** `hyva_commerce_cms_menu` is a separate content root with no `cms_page` anchor, and it ships in a different
-composer package. Its CSS has to travel as soon as a page embeds a `hyva_menu_widget`. The collector already records
-the reference and the importer already warns on it, so the gap is visible rather than silent.
-
-**Templates and snippets.** Both are copy on insert.
-`liveview-editor/Magewire/Traits/Component.php:657` `pasteComponents()` calls `regenerateUids()` and splices the
-subtree straight into the content. Loading a template and pasting from the clipboard are the same code path, and
-nothing records where the components came from. So a page never references a template or a snippet at render time,
-and the page's own CSS row already covers their components, because the compiler is fed the whole component tree.
-Their CSS tables feed the editor preview only.
-
-**Instance components.** A genuine live reference, and worth a later phase. Their classes compile into the host
-page's CSS row, so an imported page keeps its styling even when the definition is missing: it renders blank exactly
-where the component was. The same coupling cuts the other way, editing a definition leaves every host page's CSS
-stale until that page is saved again.
-
-**Product and category attribute content.** Separate content roots. Their `store_content` is keyed by store id inside
-the JSON rather than by a store table, so they need their own export shape.
-
-**Version history.** `hyva_commerce_cms_page_version_history` and its block counterpart hold per-environment editing
-history, not content. Carrying them would overwrite the target's own history.
-
-**A Transfer Center handler.** `ContentTypeHandlerInterface` is `@api` and genuinely open, and
-`Hyva\MenuBuilder\Model\ImportExport\MenuHandler` proves a third-party package can register one. But the Transfer
-Center has no server-side ZIP and no CLI: assembly and extraction happen in the browser with a bundled `fflate.js`,
-and the server side is a handful of adminhtml AJAX endpoints behind an admin session. A handler therefore buys a CLI
-tool nothing. Worth adding later if these types should also appear in the admin UI.
+Menus, templates, snippets, instance components, attribute content and version history are not exported.
+Templates and snippets are copy on insert, so a page never references one. The rest are separate content
+roots.
