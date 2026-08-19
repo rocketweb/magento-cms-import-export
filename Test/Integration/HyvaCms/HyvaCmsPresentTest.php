@@ -49,6 +49,45 @@ class HyvaCmsPresentTest extends TestCase
     }
 
     /**
+     * A menu has no native row to hang off, so the writer creates it, and a second write with the same
+     * identifier has to update that row rather than add a second one.
+     *
+     * is_active is asserted false on purpose: publishing forces it true inside Menu Builder, so this is the
+     * regression test for the flag being written back afterwards.
+     */
+    public function testMenuRoundTripCreatesThenUpdatesOneRow(): void
+    {
+        if (!$this->writer->isMenuAvailable()) {
+            $this->markTestSkipped('Hyva Menu Builder is not installed, the layer under test does not exist here.');
+        }
+
+        $payload = [
+            'title' => 'Round trip menu',
+            'identifier' => 'rw-round-trip-menu',
+            'is_active' => false,
+            'preview_url_key' => null,
+            'is_tailwindcss_jit_enabled' => false,
+            'draft_content' => '{"content":[]}',
+            'published_content' => '{"content":[]}',
+            'tailwindcss' => []
+        ];
+
+        $menuId = $this->writer->saveMenuRow($payload, [1]);
+        $this->writer->writeMenu((int)$menuId, $payload);
+
+        $exported = $this->reader->readMenu((int)$menuId);
+        $this->assertSame('rw-round-trip-menu', $exported['identifier']);
+        $this->assertSame('Round trip menu', $exported['title']);
+        $this->assertFalse($exported['is_active']);
+
+        $payload['title'] = 'Round trip menu renamed';
+        $secondId = $this->writer->saveMenuRow($payload, [1]);
+
+        $this->assertSame($menuId, $secondId, 'A same identifier import has to update rather than duplicate.');
+        $this->assertSame('Round trip menu renamed', $this->reader->readMenu((int)$secondId)['title']);
+    }
+
+    /**
      * @magentoDataFixture Magento/Cms/_files/pages.php
      */
     public function testReadReturnsNullForAPageThatIsNotHyvaManaged(): void

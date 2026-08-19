@@ -25,7 +25,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class ImportCmsData extends \Symfony\Component\Console\Command\Command
 {
     private const INPUT_KEY_TYPE = 'type';
-    private const INPUT_TYPE_VALUES = ['block', 'page', 'all'];
+    private const INPUT_TYPE_VALUES = ['block', 'page', 'menu', 'all'];
     private const INPUT_KEY_IDENTIFIER = 'identifier';
     private const INPUT_KEY_IMPORT_ALL = 'importAll';
     private const INPUT_KEY_STORE = 'store';
@@ -49,7 +49,7 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
                 self::INPUT_KEY_TYPE,
                 't',
                 InputOption::VALUE_REQUIRED,
-                'Which type are we importing - block/page/all'
+                'Which type are we importing - block/page/menu/all (all covers block and page)'
             ),
             new InputOption(
                 self::INPUT_KEY_IDENTIFIER,
@@ -96,6 +96,10 @@ class ImportCmsData extends \Symfony\Component\Console\Command\Command
         }
         if ($type == 'all' || $type == 'page') {
             $types[] = 'page';
+        }
+        // Menus stay out of 'all' on purpose, so that an existing import command keeps reading the same files.
+        if ($type == 'menu') {
+            $types[] = 'menu';
         }
 
         $identifiers = $input->getOption(self::INPUT_KEY_IDENTIFIER);

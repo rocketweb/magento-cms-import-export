@@ -77,7 +77,33 @@ class DumpCmsDataService
                 $this->dumpBlocks($workingDirPath . '/cms/blocks/', $varDirectory, $identifiers, $hyvaCms);
             } else if ($type == 'page') {
                 $this->dumpPages($workingDirPath . '/cms/pages/', $varDirectory, $identifiers, $hyvaCms);
+            } else if ($type == 'menu') {
+                $this->dumpMenus($workingDirPath . '/cms/menus/', $varDirectory, $identifiers);
             }
+        }
+    }
+
+    /**
+     * A menu has no native CMS row behind it, so it exports as a single json file rather than the html, json and
+     * hyva.json trio the other types use. That also makes --hyva-cms meaningless here: the Hyva content is the
+     * whole entity, so --type=menu always carries it.
+     */
+    private function dumpMenus(string $path, WriteInterface $varDirectory, ?array $identifiers): void
+    {
+        if (!$this->hyvaContentReader->isMenuAvailable()) {
+            echo "Warning: menus were requested but Hyva Menu Builder is not installed, nothing was dumped\n";
+            return;
+        }
+
+        foreach ($this->hyvaContentReader->readMenus($identifiers) as $menu) {
+            $payload = $menu['payload'];
+            $identifier = trim((string)$payload['identifier']);
+            $storeCodes = $this->getStoreCodes($menu['stores']);
+            $payload['stores'] = $storeCodes;
+
+            $this->warnOnLargeCss($identifier, $payload['tailwindcss']);
+            $filePath = $path . str_replace('/', '---', $identifier) . '---' . implode('---', $storeCodes) . '.json';
+            $this->write($varDirectory, $filePath, $this->serializer->serialize($payload));
         }
     }
 

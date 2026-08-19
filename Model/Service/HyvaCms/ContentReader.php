@@ -33,9 +33,11 @@ class ContentReader
 {
     private const PAGE_REPOSITORY = \Hyva\CmsMagento\Api\PageRepositoryInterface::class;
     private const BLOCK_REPOSITORY = \Hyva\CmsMagento\Api\BlockRepositoryInterface::class;
+    private const MENU_REPOSITORY = \Hyva\MenuBuilder\Api\MenuRepositoryInterface::class;
     private const JIT_CSS_REPOSITORY = \Hyva\CmsLiveviewEditor\Model\Tailwind\JitCssRepository::class;
     private const ENTITY_TYPE_PAGE = 'cms_page';
     private const ENTITY_TYPE_BLOCK = 'cms_block';
+    private const ENTITY_TYPE_MENU = 'menu';
     private const EDITIONS = ['published', 'draft'];
 
     /**
@@ -49,13 +51,19 @@ class ContentReader
     private readonly ?object $blockRepository;
 
     /**
+     * @var \Hyva\MenuBuilder\Api\MenuRepositoryInterface|null
+     */
+    private readonly ?object $menuRepository;
+
+    /**
      * @var \Hyva\CmsLiveviewEditor\Model\Tailwind\JitCssRepository|null
      */
     private readonly ?object $jitCssRepository;
 
     public function __construct(
         \Magento\Framework\ObjectManagerInterface $objectManager,
-        private readonly \RocketWeb\CmsImportExport\Model\Service\HyvaCms\ReferenceCollector $referenceCollector
+        private readonly \RocketWeb\CmsImportExport\Model\Service\HyvaCms\ReferenceCollector $referenceCollector,
+        private readonly \Magento\Framework\Api\SearchCriteriaBuilderFactory $searchCriteriaBuilderFactory
     ) {
         $hyvaCmsInstalled = interface_exists(self::PAGE_REPOSITORY)
             && interface_exists(self::BLOCK_REPOSITORY)
@@ -64,11 +72,21 @@ class ContentReader
         $this->pageRepository = $hyvaCmsInstalled ? $objectManager->get(self::PAGE_REPOSITORY) : null;
         $this->blockRepository = $hyvaCmsInstalled ? $objectManager->get(self::BLOCK_REPOSITORY) : null;
         $this->jitCssRepository = $hyvaCmsInstalled ? $objectManager->get(self::JIT_CSS_REPOSITORY) : null;
+
+        // Menu Builder ships as its own package, so it is present or absent independently of Hyva CMS.
+        $this->menuRepository = $hyvaCmsInstalled && interface_exists(self::MENU_REPOSITORY)
+            ? $objectManager->get(self::MENU_REPOSITORY)
+            : null;
     }
 
     public function isAvailable(): bool
     {
         return $this->pageRepository !== null;
+    }
+
+    public function isMenuAvailable(): bool
+    {
+        return $this->menuRepository !== null;
     }
 
     /**
@@ -103,6 +121,72 @@ class ContentReader
         }
 
         return $this->buildContent($block, self::ENTITY_TYPE_BLOCK, $cmsBlockId);
+    }
+
+    /**
+     * Lists menus for the dump, so that the repository stays behind this class along with the object manager.
+     *
+     * @param array<int, string>|null $identifiers null exports every menu
+     * @return array<int, array{stores: array<int, int>, payload: array<string, mixed>}>
+     */
+    public function readMenus(?array $identifiers): array
+    {
+        if (!$this->isMenuAvailable()) {
+            return [];
+        }
+
+        $criteriaBuilder = $this->searchCriteriaBuilderFactory->create();
+        if ($identifiers) {
+            $criteriaBuilder->addFilter('identifier', $identifiers, 'in');
+        }
+
+        $menus = [];
+        foreach ($this->menuRepository->getList($criteriaBuilder->create())->getItems() as $menu) {
+            $menus[] = [
+                'stores' => $menu->getStores() ?? [],
+                'payload' => $this->buildMenuContent($menu)
+            ];
+        }
+
+        return $menus;
+    }
+
+    /**
+     * A menu is a Hyva entity in its own right, with no native CMS row behind it, so this returns the whole
+     * record rather than a sidecar to something else. Creation and update timestamps are left out: they describe
+     * the source install, and carrying them over would misdate the row on the target.
+     *
+     * @return array<string, mixed>|null null when Menu Builder is absent
+     */
+    public function readMenu(int $menuId): ?array
+    {
+        if (!$this->isMenuAvailable()) {
+            return null;
+        }
+
+        return $this->buildMenuContent($this->menuRepository->get($menuId));
+    }
+
+    /**
+     * @param object $menu \Hyva\MenuBuilder\Api\Data\MenuInterface
+     * @return array<string, mixed>
+     */
+    private function buildMenuContent(object $menu): array
+    {
+        $draftContent = $menu->getDraftContent();
+        $publishedContent = $menu->getPublishedContent();
+
+        return [
+            'title' => $menu->getTitle(),
+            'identifier' => $menu->getIdentifier(),
+            'is_active' => (bool)$menu->isActive(),
+            'preview_url_key' => $menu->getPreviewUrlKey(),
+            'is_tailwindcss_jit_enabled' => (bool)$menu->isTailwindcssJitEnabled(),
+            'draft_content' => $draftContent,
+            'published_content' => $publishedContent,
+            'references' => $this->referenceCollector->collectFromAll([$draftContent, $publishedContent]),
+            'tailwindcss' => $this->readTailwindcss(self::ENTITY_TYPE_MENU, (int)$menu->getId())
+        ];
     }
 
     /**

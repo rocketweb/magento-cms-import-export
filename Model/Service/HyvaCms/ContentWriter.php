@@ -37,9 +37,12 @@ class ContentWriter
     private const PROVIDER = \Hyva\CmsLiveviewEditor\Model\Provider::class;
     private const PAGE_REPOSITORY = \Hyva\CmsMagento\Api\PageRepositoryInterface::class;
     private const BLOCK_REPOSITORY = \Hyva\CmsMagento\Api\BlockRepositoryInterface::class;
+    private const MENU_REPOSITORY = \Hyva\MenuBuilder\Api\MenuRepositoryInterface::class;
+    private const MENU_FACTORY = \Hyva\MenuBuilder\Model\MenuFactory::class;
     private const JIT_CSS_REPOSITORY = \Hyva\CmsLiveviewEditor\Model\Tailwind\JitCssRepository::class;
     private const ENTITY_TYPE_PAGE = 'cms_page';
     private const ENTITY_TYPE_BLOCK = 'cms_block';
+    private const ENTITY_TYPE_MENU = 'menu';
     private const EDITION_PUBLISHED = 'published';
     private const EDITION_DRAFT = 'draft';
     private const EDITIONS_IN_WRITE_ORDER = [self::EDITION_PUBLISHED, self::EDITION_DRAFT];
@@ -64,6 +67,16 @@ class ContentWriter
      */
     private readonly ?object $jitCssRepository;
 
+    /**
+     * @var \Hyva\MenuBuilder\Api\MenuRepositoryInterface|null
+     */
+    private readonly ?object $menuRepository;
+
+    /**
+     * @var \Hyva\MenuBuilder\Model\MenuFactory|null
+     */
+    private readonly ?object $menuFactory;
+
     public function __construct(
         \Magento\Framework\ObjectManagerInterface $objectManager
     ) {
@@ -76,11 +89,62 @@ class ContentWriter
         $this->pageRepository = $hyvaCmsInstalled ? $objectManager->get(self::PAGE_REPOSITORY) : null;
         $this->blockRepository = $hyvaCmsInstalled ? $objectManager->get(self::BLOCK_REPOSITORY) : null;
         $this->jitCssRepository = $hyvaCmsInstalled ? $objectManager->get(self::JIT_CSS_REPOSITORY) : null;
+
+        // Menu Builder ships as its own package, so it is present or absent independently of Hyva CMS.
+        $menuInstalled = $hyvaCmsInstalled
+            && interface_exists(self::MENU_REPOSITORY)
+            && class_exists(self::MENU_FACTORY);
+        $this->menuRepository = $menuInstalled ? $objectManager->get(self::MENU_REPOSITORY) : null;
+        $this->menuFactory = $menuInstalled ? $objectManager->get(self::MENU_FACTORY) : null;
     }
 
     public function isAvailable(): bool
     {
         return $this->provider !== null;
+    }
+
+    public function isMenuAvailable(): bool
+    {
+        return $this->menuRepository !== null;
+    }
+
+    /**
+     * Creates or updates the menu row itself, so that writeMenu() has an id to hang content on. Matching is by
+     * identifier within the payload's own store scope, which is what makes a re-import an update rather than a
+     * duplicate. Content is deliberately not set here: Provider::saveContent() has to do that, because only it
+     * clears the entity cache and dispatches the publish tags.
+     *
+     * @param array<string, mixed> $payload the decoded menu json file
+     * @param array<int, int> $storeIds resolved from the store codes in the file name
+     * @return int|null the saved menu id, null when Menu Builder is absent
+     */
+    public function saveMenuRow(array $payload, array $storeIds): ?int
+    {
+        if (!$this->isMenuAvailable()) {
+            return null;
+        }
+
+        $identifier = (string)($payload['identifier'] ?? '');
+        try {
+            $menu = $this->menuRepository->getByIdentifier($identifier, (int)reset($storeIds));
+        } catch (\Magento\Framework\Exception\NoSuchEntityException $exception) {
+            $menu = $this->menuFactory->create();
+        }
+
+        $menu->setTitle((string)($payload['title'] ?? $identifier));
+        $menu->setIdentifier($identifier);
+        $menu->setIsActive((bool)($payload['is_active'] ?? true));
+        $menu->setStores($storeIds);
+
+        if (array_key_exists('preview_url_key', $payload)) {
+            $menu->setPreviewUrlKey($payload['preview_url_key'] === null ? null : (string)$payload['preview_url_key']);
+        }
+
+        if (array_key_exists('is_tailwindcss_jit_enabled', $payload)) {
+            $menu->setIsTailwindcssJitEnabled((bool)$payload['is_tailwindcss_jit_enabled']);
+        }
+
+        return (int)$this->menuRepository->save($menu)->getId();
     }
 
     /**
@@ -99,6 +163,36 @@ class ContentWriter
     public function writeBlock(int $cmsBlockId, array $payload): void
     {
         $this->write(self::ENTITY_TYPE_BLOCK, $cmsBlockId, $payload);
+    }
+
+    /**
+     * A menu carries its own title, identifier, store assignment and flags on the same row as its content, and
+     * the importer saves that row through saveMenuRow() before calling this.
+     *
+     * is_active is written again at the end because MenuProvider::saveContent() forces it true on publish, the
+     * way it forces is_liveview_enabled true for a page. An inactive menu would otherwise come back enabled.
+     *
+     * @param int $menuId the id of the menu row the importer just saved
+     * @param array<string, mixed> $payload the decoded menu json file
+     */
+    public function writeMenu(int $menuId, array $payload): void
+    {
+        if (!$this->isMenuAvailable()) {
+            return;
+        }
+
+        $tailwindcss = $payload['tailwindcss'] ?? [];
+
+        $this->writeContent(self::ENTITY_TYPE_MENU, $menuId, $payload);
+        $this->writeTailwindcss(self::ENTITY_TYPE_MENU, $menuId, is_array($tailwindcss) ? $tailwindcss : []);
+
+        if (!array_key_exists('is_active', $payload)) {
+            return;
+        }
+
+        $menu = $this->menuRepository->get($menuId);
+        $menu->setIsActive((bool)$payload['is_active']);
+        $this->menuRepository->save($menu);
     }
 
     /**
