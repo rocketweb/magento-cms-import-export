@@ -110,16 +110,14 @@ class CategoryLinkMapperTest extends TestCase
     }
 
     /**
-     * The fixture sets no url key, and url_path generation depends on rewrite observers that this suite has no
-     * reason to rely on, so the value under test is written explicitly.
+     * url_path is generated from the category name, and setting it explicitly does not stick because the url
+     * path autogenerator overwrites it on save. The generated value is read instead, and only its presence is
+     * asserted: what matters here is the round trip, not which slug Magento picked.
      */
     private function givenCategoryUrlPath(int $categoryId): string
     {
-        $urlPath = 'rw-mapper-test-category';
-        $category = $this->categoryRepository->get($categoryId);
-        $category->setData('url_key', $urlPath);
-        $category->setData('url_path', $urlPath);
-        $this->categoryRepository->save($category);
+        $urlPath = (string)$this->categoryRepository->get($categoryId)->getData('url_path');
+        $this->assertNotSame('', $urlPath, 'The fixture category needs a url_path for this test to mean anything.');
 
         return $urlPath;
     }
