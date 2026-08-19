@@ -73,10 +73,55 @@ class HyvaCmsAbsentTest extends TestCase
         $this->assertFalse($this->writer->isAvailable());
     }
 
+    /**
+     * Menu Builder is a separate package from Hyva CMS, so it gets its own availability flag and its own
+     * degraded path.
+     */
+    public function testMenuSupportReportsItselfUnavailable(): void
+    {
+        $this->assertFalse($this->reader->isMenuAvailable());
+        $this->assertFalse($this->writer->isMenuAvailable());
+    }
+
     public function testReaderReturnsNullRatherThanFataling(): void
     {
         $this->assertNull($this->reader->readPage(1));
         $this->assertNull($this->reader->readBlock(1));
+        $this->assertNull($this->reader->readMenu(1));
+        $this->assertSame([], $this->reader->readMenus(null));
+    }
+
+    public function testMenuWriterIsANoOpRatherThanFataling(): void
+    {
+        $payload = [
+            'title' => 'Main navigation',
+            'identifier' => 'main-nav',
+            'is_active' => true,
+            'draft_content' => '{"content":[]}',
+            'published_content' => '{"content":[]}',
+            'tailwindcss' => []
+        ];
+
+        $this->assertNull($this->writer->saveMenuRow($payload, [1]));
+        $this->writer->writeMenu(1, $payload);
+
+        $this->assertFalse($this->writer->isMenuAvailable());
+    }
+
+    /**
+     * The export has to warn and return rather than fatal on the missing repository, the same way the page and
+     * block export does when Hyva CMS is absent.
+     *
+     * @throws FileSystemException
+     */
+    public function testMenuExportWarnsAndWritesNothing(): void
+    {
+        ob_start();
+        $this->exporter->execute(['menu'], null, false);
+        $output = (string)ob_get_clean();
+
+        $this->assertStringContainsString('Menu Builder is not installed', $output);
+        $this->assertFalse($this->varDirectory->isExist($this->exportDirPath . '/cms/menus'));
     }
 
     public function testWriterIsANoOpRatherThanFataling(): void

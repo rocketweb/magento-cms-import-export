@@ -94,6 +94,8 @@ class ImportCmsDataService
                 $this->importBlocks($typeDirPath, $identifiers, $storeCode, $hyvaCms);
             } else if ($type == 'page') {
                 $this->importPages($typeDirPath, $identifiers, $storeCode, $hyvaCms);
+            } else if ($type == 'menu') {
+                $this->importMenus($typeDirPath, $identifiers, $storeCode);
             }
         }
 
@@ -123,6 +125,77 @@ class ImportCmsDataService
         }
 
         return $storeIds;
+    }
+
+    /**
+     * A menu is one json file with no html sibling, because it has no native CMS row behind it. The row is saved
+     * first so that the content write has an id, and only then does the Hyva content and CSS follow.
+     */
+    private function importMenus(string $dirPath, ?array $identifiers, ?string $storeCode = null): void
+    {
+        if (!$this->hyvaContentWriter->isMenuAvailable()) {
+            echo "Warning: menus were requested but Hyva Menu Builder is not installed, nothing was imported\n";
+            return;
+        }
+
+        foreach ($this->directoryRead->read($this->varPath . $dirPath) as $filePath) {
+            if (substr($filePath, -5) !== '.json') {
+                continue;
+            }
+
+            $identifier = str_replace($dirPath, '', $filePath);
+            $identifier = substr_replace($identifier, '', (int)strrpos($identifier, '---'));
+            $identifier = str_replace('---', '/', $identifier);
+            if ($identifiers !== null && !in_array($identifier, $identifiers)) {
+                continue;
+            }
+
+            if ($storeCode !== null && $this->getStoreCodeFromJsonPath($filePath) !== $storeCode) {
+                echo sprintf(
+                    'Skipping identifier %s because requested update only for store %s %s',
+                    $identifier,
+                    $storeCode,
+                    PHP_EOL
+                );
+                continue;
+            }
+
+            $entityLabel = sprintf('menu "%s"', $identifier);
+            try {
+                $payload = $this->serializer->unserialize($this->directoryRead->readFile($filePath));
+            } catch (\Exception $exception) {
+                $this->warnHyva(sprintf('%s is unreadable: %s', $entityLabel, $exception->getMessage()));
+                continue;
+            }
+
+            if (!is_array($payload)) {
+                $this->warnHyva(sprintf('%s is not an object, skipping it', $entityLabel));
+                continue;
+            }
+
+            $storeIds = $this->getStoreIds($payload['stores'] ?? []);
+            try {
+                $menuId = $this->hyvaContentWriter->saveMenuRow($payload, $storeIds);
+                $this->hyvaContentWriter->writeMenu((int)$menuId, $payload);
+            } catch (\Exception $exception) {
+                $this->warnHyva(sprintf('%s could not be written: %s', $entityLabel, $exception->getMessage()));
+                continue;
+            }
+
+            foreach ($this->hyvaPayloadValidator->validate($entityLabel, $payload) as $warning) {
+                $this->warnHyva($warning);
+            }
+        }
+    }
+
+    /**
+     * The store code sits between the last --- and the .json suffix, as it does for the html files.
+     */
+    private function getStoreCodeFromJsonPath(string $filePath): string
+    {
+        $storeCode = substr($filePath, 0, -5);
+
+        return substr($storeCode, (int)strrpos($storeCode, '---') + 3);
     }
 
     private function importBlocks(

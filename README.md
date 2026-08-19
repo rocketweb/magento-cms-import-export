@@ -141,6 +141,28 @@ Watch out for:
 - A missing block, menu or instance component renders as nothing, silently. The importer warns per miss.
 - Treat these files as code. Content and CSS reach the storefront unescaped, as the `.html` always has.
 
-Menus, templates, snippets, instance components, attribute content and version history are not exported.
+Templates, snippets, instance components, attribute content and version history are not exported.
 Templates and snippets are copy on insert, so a page never references one. The rest are separate content
 roots.
+
+## Hyva menus
+
+A Menu Builder menu has no native CMS row behind it, so it exports as one file rather than the html, json
+and hyva.json trio: `var/sync_cms_data/cms/menus/%%IDENTIFIER%%---%%STORES%%.json`, holding the whole
+record plus its CSS rows and the same diagnostic `references` list.
+
+```
+php bin/magento cms:dump:data   --type=menu -i main-nav
+php bin/magento cms:import:data --type=menu -i main-nav
+```
+
+`--type=menu` needs `hyva-themes/commerce-module-menu-builder`; without it both commands warn and do
+nothing. `--hyva-cms` has no meaning here, because the Hyva content is the whole entity.
+
+Watch out for:
+
+- **`--type=all` does not include menus.** Ask for them explicitly.
+- **Category links do not survive the trip.** A menu item stores the identifier for a CMS page and the
+  SKU for a product, but a category link and `hyva_menu_category_tree` store category IDs.
+- A menu matches by identifier within its own store scope, so a re-import updates rather than duplicates.
+- Pointing a storefront at the menu is separate configuration, `design/header/topmenu_identifier`.

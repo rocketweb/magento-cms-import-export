@@ -23,7 +23,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class DumpCmsData extends \Symfony\Component\Console\Command\Command
 {
     private const INPUT_KEY_TYPE = 'type';
-    private const INPUT_TYPE_VALUES = ['block', 'page', 'all'];
+    private const INPUT_TYPE_VALUES = ['block', 'page', 'menu', 'all'];
     private const INPUT_KEY_IDENTIFIER = 'identifier';
     private const INPUT_KEY_REMOVE_ALL = 'removeAll';
     private const INPUT_KEY_HYVA_CMS = 'hyva-cms';
@@ -46,7 +46,7 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
                 self::INPUT_KEY_TYPE,
                 't',
                 InputOption::VALUE_REQUIRED,
-                'Which type are we dumping - block/page/all'
+                'Which type are we dumping - block/page/menu/all (all covers block and page)'
             ),
             new InputOption(
                 self::INPUT_KEY_IDENTIFIER,
@@ -87,6 +87,10 @@ class DumpCmsData extends \Symfony\Component\Console\Command\Command
         }
         if ($type == 'all' || $type == 'page') {
             $types[] = 'page';
+        }
+        // Menus stay out of 'all' on purpose, so that an existing dump command keeps writing the same files.
+        if ($type == 'menu') {
+            $types[] = 'menu';
         }
 
         $identifiers = $input->getOption(self::INPUT_KEY_IDENTIFIER);
