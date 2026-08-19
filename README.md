@@ -148,9 +148,8 @@ roots.
 ## Hyva menus
 
 A Menu Builder menu has no native CMS row behind it, so it exports as one file rather than the html, json
-and hyva.json trio: `var/sync_cms_data/cms/menus/%%IDENTIFIER%%---%%STORES%%.json`. That file holds the
-title, identifier, active flag, preview url key, both content columns, every `{theme, edition, css}` row
-and the same diagnostic `references` list.
+and hyva.json trio: `var/sync_cms_data/cms/menus/%%IDENTIFIER%%---%%STORES%%.json`, holding the whole
+record plus its CSS rows and the same diagnostic `references` list.
 
 ```
 php bin/magento cms:dump:data   --type=menu -i main-nav
@@ -162,14 +161,8 @@ nothing. `--hyva-cms` has no meaning here, because the Hyva content is the whole
 
 Watch out for:
 
-- **`--type=all` does not include menus.** It stays block and page, so an existing command keeps writing
-  and reading the same files. Ask for menus explicitly.
-- **A menu is matched by identifier within its own store scope.** Same identifier means update, so a
-  re-import never duplicates a menu.
-- **Category and product links do not survive the trip.** A menu item stores the identifier for a CMS
-  page and the SKU for a product, both of which port, but a category link and `hyva_menu_category_tree`
-  store category IDs, which differ per environment.
-- The importer sets the menu active again from the file after writing content, because publishing forces
-  it on. An inactive menu stays inactive.
-- Pointing a storefront at an imported menu is separate configuration: `design/header/topmenu_identifier`
-  under Content > Design > Configuration.
+- **`--type=all` does not include menus.** Ask for them explicitly.
+- **Category links do not survive the trip.** A menu item stores the identifier for a CMS page and the
+  SKU for a product, but a category link and `hyva_menu_category_tree` store category IDs.
+- A menu matches by identifier within its own store scope, so a re-import updates rather than duplicates.
+- Pointing a storefront at the menu is separate configuration, `design/header/topmenu_identifier`.
