@@ -162,7 +162,8 @@ nothing. `--hyva-cms` has no meaning here, because the Hyva content is the whole
 Watch out for:
 
 - **`--type=all` does not include menus.** Ask for them explicitly.
-- **Category links do not survive the trip.** A menu item stores the identifier for a CMS page and the
-  SKU for a product, but a category link and `hyva_menu_category_tree` store category IDs.
+- **Category links export as `url_path`, not as an entity id**, so they resolve on the target. That covers
+  a `category` link and `hyva_menu_category_tree`. A path the target does not have is reported and left
+  alone, so the link renders as nothing until the category exists.
 - A menu matches by identifier within its own store scope, so a re-import updates rather than duplicates.
 - Pointing a storefront at the menu is separate configuration, `design/header/topmenu_identifier`.

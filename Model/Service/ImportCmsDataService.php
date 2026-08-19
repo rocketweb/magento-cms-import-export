@@ -174,12 +174,17 @@ class ImportCmsDataService
             }
 
             $storeIds = $this->getStoreIds($payload['stores'] ?? []);
+            $categoryWarnings = [];
             try {
                 $menuId = $this->hyvaContentWriter->saveMenuRow($payload, $storeIds);
-                $this->hyvaContentWriter->writeMenu((int)$menuId, $payload);
+                $this->hyvaContentWriter->writeMenu((int)$menuId, $payload, $categoryWarnings);
             } catch (\Exception $exception) {
                 $this->warnHyva(sprintf('%s could not be written: %s', $entityLabel, $exception->getMessage()));
                 continue;
+            }
+
+            foreach ($categoryWarnings as $warning) {
+                $this->warnHyva(sprintf('%s: %s', $entityLabel, $warning));
             }
 
             foreach ($this->hyvaPayloadValidator->validate($entityLabel, $payload) as $warning) {

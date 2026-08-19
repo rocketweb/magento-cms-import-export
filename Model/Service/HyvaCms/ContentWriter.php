@@ -78,7 +78,8 @@ class ContentWriter
     private readonly ?object $menuFactory;
 
     public function __construct(
-        \Magento\Framework\ObjectManagerInterface $objectManager
+        \Magento\Framework\ObjectManagerInterface $objectManager,
+        private readonly \RocketWeb\CmsImportExport\Model\Service\HyvaCms\CategoryLinkMapper $categoryLinkMapper
     ) {
         $hyvaCmsInstalled = interface_exists(self::PAGE_REPOSITORY)
             && interface_exists(self::BLOCK_REPOSITORY)
@@ -175,13 +176,23 @@ class ContentWriter
      * @param int $menuId the id of the menu row the importer just saved
      * @param array<string, mixed> $payload the decoded menu json file
      */
-    public function writeMenu(int $menuId, array $payload): void
+    public function writeMenu(int $menuId, array $payload, array &$warnings = []): void
     {
         if (!$this->isMenuAvailable()) {
             return;
         }
 
         $tailwindcss = $payload['tailwindcss'] ?? [];
+
+        foreach (['draft_content', 'published_content'] as $key) {
+            if (!isset($payload[$key]) || !is_string($payload[$key])) {
+                continue;
+            }
+
+            $payload[$key] = $this->categoryLinkMapper->pathsToIds($payload[$key], $warnings);
+        }
+
+        $warnings = array_values(array_unique($warnings));
 
         $this->writeContent(self::ENTITY_TYPE_MENU, $menuId, $payload);
         $this->writeTailwindcss(self::ENTITY_TYPE_MENU, $menuId, is_array($tailwindcss) ? $tailwindcss : []);

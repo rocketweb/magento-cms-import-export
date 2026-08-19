@@ -63,7 +63,8 @@ class ContentReader
     public function __construct(
         \Magento\Framework\ObjectManagerInterface $objectManager,
         private readonly \RocketWeb\CmsImportExport\Model\Service\HyvaCms\ReferenceCollector $referenceCollector,
-        private readonly \Magento\Framework\Api\SearchCriteriaBuilderFactory $searchCriteriaBuilderFactory
+        private readonly \Magento\Framework\Api\SearchCriteriaBuilderFactory $searchCriteriaBuilderFactory,
+        private readonly \RocketWeb\CmsImportExport\Model\Service\HyvaCms\CategoryLinkMapper $categoryLinkMapper
     ) {
         $hyvaCmsInstalled = interface_exists(self::PAGE_REPOSITORY)
             && interface_exists(self::BLOCK_REPOSITORY)
@@ -173,8 +174,13 @@ class ContentReader
      */
     private function buildMenuContent(object $menu): array
     {
-        $draftContent = $menu->getDraftContent();
-        $publishedContent = $menu->getPublishedContent();
+        $warnings = [];
+        $draftContent = $this->categoryLinkMapper->idsToPaths($menu->getDraftContent(), $warnings);
+        $publishedContent = $this->categoryLinkMapper->idsToPaths($menu->getPublishedContent(), $warnings);
+
+        foreach (array_unique($warnings) as $warning) {
+            echo sprintf('menu "%s": %s%s', (string)$menu->getIdentifier(), $warning, PHP_EOL);
+        }
 
         return [
             'title' => $menu->getTitle(),
